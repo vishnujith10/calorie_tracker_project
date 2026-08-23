@@ -1,0 +1,23 @@
+# Set default behavior for all files
+* text=auto
+
+# Git config files should use LF
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Explicitly set line endings for specific file types
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.svg text eol=lf
+*.txt text eol=lf
+
+# Binary files should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
