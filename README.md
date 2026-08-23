@@ -1,59 +1,129 @@
-# Welcome to your Expo app 👋
+# Calk (formerly Kalry) 📱🥗
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Calk is a smart React Native / Expo fitness and nutrition tracker powered by Google Gemini AI and Supabase. The app tracks daily calorie intake, macronutrients (protein, carbs, fat, fiber), hydration, weight, sleep, and activity with advanced AI-driven tools.
 
-## Get started
+---
 
-1. Install dependencies
+## 🌟 Key Features
 
-   ```bash
-   npm install
-   ```
+### 📸 Photo-to-Calorie Estimation
+Simply snap or upload a photo of your meal. The app uses the advanced **Gemini 3.6 Flash** vision model to identify distinct food items, estimate portion sizes, compute nutritional information (calories, protein, carbs, fat, fiber), and write a customized insight based on user oil/portion preferences.
 
-2. Start the app
+### 🎙️ Voice-to-Calorie Logging
+Describe what you ate out loud. Calk transcribes your audio and estimates the meals, portions, and complete nutritional breakdown in real-time.
 
-   ```bash
-   npx expo start
-   ```
+### 🤖 Context-Aware AI Coach
+Chat with your personal AI wellness coach (powered by Gemini). The coach has full awareness of your current day's live context (your calorie goals, logged meals, hydration intake, and weight trend) to give highly personalized, action-oriented, and encouraging guidance.
 
-In the output, you'll find options to open the app in a
+### 💾 Saved Meals Library (Meal Templates)
+Create and save reusable meal templates. The meal library allows you to easily log common meals with a single tap. 
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 📈 Daily Summaries & Streaks
+Keeps you motivated with a streak tracker, compassionate daily wellness analysis, and interactive progress charts.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 💧 Hydration, Sleep & Steps Tracker
+Log your daily water intake, sleep patterns, and track your daily steps (sensors integrated directly inside the app).
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🛠️ Tech Stack
 
+- **Frontend**: React Native, Expo (SDK 54), Expo Router, React Navigation, Vector Icons, Safe Area Context.
+- **Backend / Database**: Supabase (PostgreSQL, Auth, RLS, Storage Buckets).
+- **AI Models**: Google Gemini API (`gemini-3.6-flash` standard).
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- [Node.js](https://nodejs.org/) (v18+)
+- [Expo Go](https://expo.dev/go) app installed on your physical iOS/Android device, or an Emulator/Simulator.
+
+### 2. Installation
+Clone the repository, navigate to the project directory, and install dependencies:
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 3. Environment Configuration
+Create a `.env` file in the root of the project (if not already present) and configure the following variables:
 
-## Learn more
+```ini
+# Supabase Configuration
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-To learn more about developing your project with Expo, look at the following resources:
+# Gemini AI API Configuration
+EXPO_PUBLIC_GEMINI_API_KEY=your-gemini-key
+EXPO_PUBLIC_GEMINI_COACH_KEY=your-gemini-coach-key
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# OAuth / OAuth Scheme
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_WEB_CLIENT_ID=your-google-web-client-id
+EXPO_PUBLIC_SCHEME=calk://
+```
 
-## Join the community
+### 4. Running the Development Server
+Start the Expo development server:
+```bash
+npx expo start --clear
+```
+Scan the QR code shown in the terminal with your phone using **Expo Go** or press `a` (Android) / `i` (iOS) to run in an emulator.
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-# Kalry_new
-# Kalry_new
-# Kalry_new
-# kalry_new
-# kalryapp
-# kalryapp
-# kalryapp
-# kalryapp
-# kalryapp
+## 📂 Project Directory Structure
+
+```
+├── assets/                  # App fonts, images, and brand assets
+├── src/
+│   ├── caloriescreen/       # Custom camera, photo/voice calorie logs, saved meals list
+│   ├── components/          # Reusable UI elements (Daily Check-in, Error Boundary)
+│   ├── context/             # React Context for global state (Auth, Onboarding, Theme)
+│   ├── homescreens/         # Core screens (HomeScreen, Journal, Main Dashboard, Footer)
+│   ├── hydrationscreen/     # Hydration (Water) tracking features
+│   ├── lib/                 # Core library initializations (Supabase connection)
+│   ├── loginsignup/         # Authentication flows (Login, Signup, Google Sign-in)
+│   ├── onboarding/          # Multi-step profile wizard (Goals, Activity, Preferences)
+│   ├── profilescreen/       # Profile configuration and app settings
+│   ├── screens/             # Extra utility screens (AI Coach, Manual Log, Speed Target)
+│   ├── sleepscreen/         # Sleep tracking page
+│   ├── steptrackerscreen/   # Active step tracker page
+│   ├── weightscreen/        # Weight tracker & entry pages
+│   └── utils/               # AI Engine integrations, API wrappers, caches, streak service
+├── App.js                   # Application Entry & Navigation Stack
+├── app.config.js            # Expo Configuration
+└── package.json             # Core scripts and dependencies
+```
+
+---
+
+## 🗄️ Supabase Schema Reference
+
+### `saved_meal` Table
+Stores templates of meals that users can quickly re-use.
+- `id` (UUID, Primary Key)
+- `user_id` (UUID, Foreign Key referencing auth.users)
+- `dish_name` (Text) - Name of the saved meal
+- `description` (Text) - Summary of ingredients/modifiers
+- `calories` (Integer) - Estimated calories
+- `protein` (Integer) - Protein in grams
+- `carbs` (Integer) - Carbohydrates in grams
+- `fat` (Integer) - Fat in grams
+- `fiber` (Integer) - Fiber in grams
+- `photo_url` (Text) - Path to the meal photo in Supabase storage
+- `created_at` (Timestamp)
+
+### `user_food_logs` Table
+Stores daily meal entries logged by the user.
+- `id` (UUID, Primary Key)
+- `user_id` (UUID, Foreign Key)
+- `meal_name` (Text)
+- `calories` (Integer)
+- `protein` (Integer)
+- `carbs` (Integer)
+- `fat` (Integer)
+- `fiber` (Integer)
+- `meal_type` (Text) - e.g. Breakfast, Lunch, Dinner, Saved Meal
+- `created_at` (Timestamp)
