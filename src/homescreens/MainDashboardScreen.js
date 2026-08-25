@@ -19,6 +19,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import Svg, { Circle } from "react-native-svg";
 import { DailyCheckInModal } from "../components/DailyCheckInModal";
 import { OnboardingContext } from "../context/OnboardingContext";
 import { useTheme } from "../context/ThemeContext";
@@ -1352,85 +1353,95 @@ const MainDashboardScreen = ({ route }) => {
         </TouchableOpacity>
 
         <View style={styles.dashboardContainer}>
-          <View style={styles.featureCard}>
-            <View style={styles.featureCardHeader}>
-              <View style={styles.featureTitleWrap}>
-                <View style={styles.featureIconShell}>
-                  <MaterialCommunityIcons
-                    name="fire"
-                    size={24}
-                    color={COLORS.primary}
-                  />
-                </View>
-                <View>
-                  <Text style={styles.featureEyebrow}>Featured metric</Text>
-                  <Text style={styles.featureTitle}>Calories Today</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate("Home")}
-                activeOpacity={0.85}
-                style={styles.featureActionPill}
-              >
-                <Text style={styles.featureActionText}>Open meals</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.featureStatsRow}>
-              <Text style={styles.featureValue}>{calories}</Text>
-              <Text style={styles.featureSlash}>/</Text>
-              <Text style={styles.featureTarget}>{calorie_goal}</Text>
-            </View>
-
-            <View style={styles.featureProgressTrack}>
-              <View
-                style={[
-                  styles.featureProgressFill,
-                  { width: `${Math.max(4, summaryPercent)}%` },
-                ]}
-              />
-            </View>
-
-            <View style={styles.featureBottomRow}>
-              <Text style={styles.featureMeta}>{mealsLogged} meals logged</Text>
-              <Text style={styles.featureMeta}>
-                {macro_targets.protein_g}g protein target
-              </Text>
-            </View>
-          </View>
-
           <View style={styles.dualCardRow}>
+            {/* ── Calorie Ring Card ── */}
             <TouchableOpacity
-              style={styles.metricCard}
-              onPress={() => navigation.navigate("Exercise")}
+              style={styles.insightMetricCard}
+              onPress={() => navigation.navigate("Home")}
               activeOpacity={0.85}
             >
-              <View style={styles.metricCardTop}>
-                <View style={styles.metricIconShell}>
+              <View style={styles.insightMetricTop}>
+                <View style={styles.insightMetricIcon}>
                   <MaterialCommunityIcons
-                    name="dumbbell"
+                    name="fire"
                     size={20}
                     color={COLORS.primary}
                   />
                 </View>
-                <Text style={styles.metricCardLabel}>Strength</Text>
+                <Text style={styles.insightMetricTitle}>Calories</Text>
               </View>
-              <Text style={styles.metricCardValue}>{todayWorkouts}</Text>
-              <Text style={styles.metricCardSub}>workouts this day</Text>
+
+              <View style={styles.calorieRingWrap}>
+                <Svg width={110} height={110} viewBox="0 0 110 110">
+                  {/* Outer Ring (Emerald Green, 75% filled) */}
+                  <Circle
+                    cx="55"
+                    cy="55"
+                    r="47"
+                    stroke="transparent"
+                    strokeWidth="6"
+                    fill="transparent"
+                  />
+                  <Circle
+                    cx="55"
+                    cy="55"
+                    r="47"
+                    stroke="#3E7974"
+                    strokeWidth="6"
+                    fill="transparent"
+                    strokeDasharray={295.31}
+                    strokeDashoffset={295.31 * 0.25}
+                    strokeLinecap="round"
+                    transform="rotate(-90 55 55)"
+                  />
+                  {/* Inner Ring (Primary Teal/Green, 60% filled) */}
+                  <Circle
+                    cx="55"
+                    cy="55"
+                    r="37"
+                    stroke="transparent"
+                    strokeWidth="6"
+                    fill="transparent"
+                  />
+                  <Circle
+                    cx="55"
+                    cy="55"
+                    r="37"
+                    stroke={COLORS.primaryLight}
+                    strokeWidth="6"
+                    fill="transparent"
+                    strokeDasharray={232.48}
+                    strokeDashoffset={232.48 * 0.4}
+                    strokeLinecap="round"
+                    transform="rotate(-90 55 55)"
+                  />
+                </Svg>
+                <View style={styles.ringCenter}>
+                  <Text style={styles.ringCalValue}>{calories}</Text>
+                  <Text style={styles.ringCalLabel}>kcal</Text>
+                </View>
+              </View>
+
+              <Text style={styles.proteinGoalText}>
+                Protein Goal: {macro_targets.protein_g}g
+              </Text>
             </TouchableOpacity>
 
-            <View style={styles.metricCardSoft}>
-              <View style={styles.metricCardTop}>
+            {/* ── Daily Note Card ── */}
+            <View style={styles.insightMetricCardSoft}>
+              <View style={styles.insightMetricTop}>
                 <View style={styles.metricIconShellSoft}>
                   <MaterialCommunityIcons
                     name="format-quote-close"
-                    size={18}
+                    size={20}
                     color={COLORS.primary}
                   />
                 </View>
-                <Text style={styles.metricCardLabel}>Daily Note</Text>
+                <Text style={styles.insightMetricTitle}>Daily Note</Text>
               </View>
-              <Text style={styles.quotePreview}>{quote}</Text>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 4 }}>
+                <Text style={styles.quotePreview}>{quote}</Text>
+              </ScrollView>
             </View>
           </View>
 
@@ -1990,7 +2001,7 @@ const createStyles = (COLORS, isDark) => {
       width: 38,
       height: 38,
       borderRadius: 14,
-      backgroundColor: COLORS.background,
+      backgroundColor:"#fff",
       alignItems: "center",
       justifyContent: "center",
       marginRight: 10,
@@ -2012,6 +2023,49 @@ const createStyles = (COLORS, isDark) => {
     metricCardSub: {
       fontSize: 13,
       fontFamily: "Manrope-Regular",
+      color: COLORS.secondary,
+    },
+
+    // ── Calorie Ring Card ──────────────────────────────────────────────────
+    calorieRingWrap: {
+      width: 110,
+      height: 110,
+      alignSelf: "center",
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: -16,
+    },
+    ringCenter: {
+      position: "absolute",
+      alignItems: "center",
+      justifyContent: "center",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    ringCalValue: {
+      fontSize: 20,
+      fontFamily: "Lexend-Bold",
+      color: COLORS.text,
+      lineHeight: 24,
+      textAlign: "center",
+    },
+    ringCalLabel: {
+      fontSize: 10,
+      fontFamily: "Manrope-Medium",
+      color: COLORS.secondary,
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+      lineHeight: 12,
+      marginTop: 1,
+    },
+    proteinGoalText: {
+      position: "absolute",
+      bottom: 5,
+      right: 16,
+      fontSize: 11,
+      fontFamily: "Manrope-SemiBold",
       color: COLORS.secondary,
     },
 
@@ -2186,6 +2240,17 @@ const createStyles = (COLORS, isDark) => {
       borderWidth: 1,
       borderColor: COLORS.cardBorder,
       ...SHADOW.sm,
+      minHeight: 185,
+    },
+
+    insightMetricCardSoft: {
+      flex: 1,
+      backgroundColor: COLORS.cardSecondary,
+      borderRadius: 26,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: COLORS.cardBorder,
+      minHeight: 185,
     },
 
     insightMetricTop: {
