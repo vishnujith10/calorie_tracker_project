@@ -34,19 +34,37 @@ if (!apiKey) {
 
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
+// Shared palette — mirrors the teal design system used across the app
+// (Home dashboard, Weight Tracker, Journal/Timeline, Daily Check-in,
+// Deep Insights, Photo/Voice Food Analysis, Text to Calorie, Settings, etc.)
+const createPalette = (isDark) => ({
+  primary: "#1F4E4A",
+  primaryMuted: "#3D6A66",
+  primaryLight: "#A8D5CE",
+  background: isDark ? "#0F1E1C" : "#F4FBFA",
+  card: isDark ? "#17302D" : "#FFFFFF",
+  cardSecondary: isDark ? "#1C3935" : "#EEF7F5",
+  cardTertiary: isDark ? "#21413D" : "#E8F3F1",
+  textPrimary: isDark ? "#F4FBFA" : "#163633",
+  textSecondary: isDark ? "#BED9D3" : "#5B7873",
+  textMuted: isDark ? "#8FAAA5" : "#7D9994",
+  border: isDark ? "#2C4A46" : "#D5E8E3",
+  borderStrong: isDark ? "#466963" : "#BFD8D3",
+  shadow: "#102624",
+  destructive: "#B94F4F",
+  selectedCard: isDark ? "#1D403B" : "#E6F5F1",
+});
+
 const PostCalorieScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { isDark } = useTheme();
+  const palette = useMemo(() => createPalette(isDark), [isDark]);
+  const styles = useMemo(() => createStyles(palette, isDark), [palette, isDark]);
   const { analysis, mealName } = route.params || {};
 
   useEffect(() => {
-    console.log("PostCalorieScreen - Theme state:", {
-      isDark,
-      background: colors.background,
-      cardBackground: colors.cardBackground,
-    });
-  }, [isDark, colors]);
+    console.log("PostCalorieScreen - Theme state:", { isDark });
+  }, [isDark]);
 
   if (!route.params) {
     console.log("No route params found, using defaults");
@@ -1003,25 +1021,17 @@ The JSON object must have this structure:
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.iconButton}
-        >
-          <Ionicons name="chevron-back" size={22} color={styles.$iconColor} />
-        </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerEyebrow}>Meal review</Text>
-          <Text style={styles.headerTitle}>Food Analysis</Text>
-        </View>
-
-        <View style={styles.iconButtonGhost}>
-          <Ionicons
-            name="sparkles-outline"
-            size={18}
-            color={styles.$iconMuted}
-          />
+      {/* Hero header — matches Photo/Voice Food Analysis screens */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.heroBackBtn}
+          >
+            <Ionicons name="chevron-back" size={22} color={palette.primary} />
+          </TouchableOpacity>
+          <Text style={styles.heroTitle}>Food Analysis</Text>
+          <View style={styles.heroSpacer} />
         </View>
       </View>
 
@@ -1029,211 +1039,161 @@ The JSON object must have this structure:
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingBottom: insets.bottom >= 20 ? insets.bottom + 120 : 120,
+          paddingHorizontal: 18,
+          paddingBottom: insets.bottom >= 20 ? insets.bottom + 20 : 20,
         }}
       >
-        <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroLabelPill}>
-              <Ionicons
-                name="scan-outline"
-                size={14}
-                color={styles.$pillIcon}
-              />
-              <Text style={styles.heroLabelText}>Analyzed result</Text>
-            </View>
-            <Text style={styles.heroTimeText}>{getCurrentTime()}</Text>
+        {/* Photo */}
+        <View style={styles.photoContainer}>
+          <Image
+            source={{
+              uri:
+                route?.params?.photoUri ||
+                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
+            }}
+            style={styles.photo}
+            resizeMode="cover"
+          />
+          <View style={styles.calorieBadge}>
+            <Text style={styles.calorieBadgeValue}>{totalCalories}</Text>
+            <Text style={styles.calorieBadgeLabel}>kcal</Text>
           </View>
+        </View>
 
-          <View style={styles.photoShell}>
-            <Image
-              source={{
-                uri:
-                  route?.params?.photoUri ||
-                  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
-              }}
-              style={styles.photo}
-              resizeMode="cover"
-            />
-            <View style={styles.photoOverlay} />
-            <View style={styles.heroCalorieBadge}>
-              <Text style={styles.heroCalorieValue}>{totalCalories}</Text>
-              <Text style={styles.heroCalorieLabel}>kcal</Text>
-            </View>
-          </View>
-
-          <View style={styles.heroTextBlock}>
-            <Text style={styles.heroTitle}>Today’s detected meal</Text>
-
-            <View style={styles.heroEditRow}>
+        {/* Food Name */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Identified Food</Text>
+            <View style={styles.editActions}>
               {isEditing ? (
-                <View style={styles.editInputWrap}>
-                  <TextInput
-                    style={[
-                      styles.foodNameInput,
-                      nameError ? styles.inputError : null,
-                    ]}
-                    value={mealNameState}
-                    onChangeText={setMealNameState}
-                    placeholder="Enter food name"
-                    placeholderTextColor={styles.$placeholderColor}
-                    autoFocus
-                  />
-                  <View style={styles.inlineActions}>
-                    <TouchableOpacity
-                      onPress={handleReanalyzeFood}
-                      disabled={isReanalyzing}
-                      style={styles.inlineActionPrimary}
-                    >
-                      {isReanalyzing ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={styles.$buttonTextOnDark}
-                        />
-                      ) : (
-                        <Ionicons
-                          name="sparkles"
-                          size={16}
-                          color={styles.$buttonTextOnDark}
-                        />
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setIsEditing(false)}
-                      style={styles.inlineActionSecondary}
-                    >
-                      <Ionicons
-                        name="close"
-                        size={16}
-                        color={styles.$iconColor}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.heroNameRow}>
-                  <Text style={styles.foodNameDisplay}>
-                    {mealNameState || analysisToUse?.dish_name || "Meal"}
-                  </Text>
+                <>
                   <TouchableOpacity
-                    onPress={() => setIsEditing(true)}
-                    style={styles.editFab}
+                    onPress={handleReanalyzeFood}
+                    disabled={isReanalyzing}
+                    style={styles.iconBtn}
+                  >
+                    {isReanalyzing ? (
+                      <ActivityIndicator size="small" color={palette.primary} />
+                    ) : (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={palette.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setIsEditing(false)}
+                    style={styles.iconBtn}
                   >
                     <Ionicons
-                      name="pencil-outline"
-                      size={16}
-                      color={styles.$iconColor}
+                      name="close-circle-outline"
+                      size={22}
+                      color={palette.textSecondary}
                     />
                   </TouchableOpacity>
-                </View>
+                </>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setIsEditing(true)}
+                  style={styles.iconBtn}
+                >
+                  <Ionicons
+                    name="pencil-outline"
+                    size={18}
+                    color={palette.primary}
+                  />
+                </TouchableOpacity>
               )}
-
-              {!!nameError && <Text style={styles.errorText}>{nameError}</Text>}
             </View>
-
-            <Text style={styles.heroSubText}>
+          </View>
+          {isEditing ? (
+            <>
+              <TextInput
+                style={[styles.foodName, styles.editableText]}
+                value={mealNameState}
+                onChangeText={setMealNameState}
+                placeholder="Enter food name"
+                placeholderTextColor={palette.textMuted}
+                autoFocus
+              />
+              {!!nameError && <Text style={styles.errorText}>{nameError}</Text>}
+            </>
+          ) : (
+            <Text style={styles.foodName}>
+              {mealNameState || analysisToUse?.dish_name || "Meal"}
+            </Text>
+          )}
+          <View style={styles.confidenceChip}>
+            <Text style={styles.confidenceText}>
               Confidence 85% • Quick log ready
             </Text>
           </View>
         </View>
 
-        <View style={styles.metricsRow}>
-          <View style={styles.healthPanel}>
-            <View style={styles.healthRing}>
-              <Text style={styles.healthRingValue}>{healthScore}</Text>
-            </View>
-            <View style={styles.healthPanelText}>
-              <Text style={styles.healthPanelTitle}>{healthText}</Text>
-              <Text style={styles.healthPanelDesc} numberOfLines={3}>
-                {infoText}
-              </Text>
-            </View>
+        {/* Health score */}
+        <View style={styles.healthCard}>
+          <View style={styles.healthRing}>
+            <Text style={styles.healthRingValue}>{healthScore}</Text>
+          </View>
+          <View style={styles.healthTextWrap}>
+            <Text style={styles.healthTitle}>{healthText}</Text>
+            <Text style={styles.healthDesc} numberOfLines={3}>
+              {infoText}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.sectionCardLarge}>
-          <View style={styles.sectionHeadingRow}>
-            <View>
-              <Text style={styles.sectionKicker}>Nutrition</Text>
-              <Text style={styles.sectionTitle}>Macro snapshot</Text>
-            </View>
-            <View style={styles.summaryChip}>
-              <Text style={styles.summaryChipText}>
-                {macrosLoaded ? "Ready" : "Loading"}
-              </Text>
-            </View>
-          </View>
-
+        {/* Nutrition Summary */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Nutrition Summary</Text>
           <View style={styles.nutritionGrid}>
-            <View style={[styles.statTile, styles.statTilePrimary]}>
-              <Text style={styles.statTileValue}>{totalCalories}</Text>
-              <Text style={styles.statTileLabel}>Calories</Text>
+            <View style={styles.nutritionItem}>
+              <Text style={styles.nutritionValue}>{totalCalories}</Text>
+              <Text style={styles.nutritionLabel}>Calories</Text>
             </View>
-
-            <View style={styles.statTile}>
-              <Text style={styles.statTileValue}>
-                {Math.round(macros.protein)}g
-              </Text>
-              <Text style={styles.statTileLabel}>Protein</Text>
+            <View style={styles.nutritionItem}>
+              <Text style={styles.nutritionValue}>{Math.round(macros.protein)}g</Text>
+              <Text style={styles.nutritionLabel}>Protein</Text>
             </View>
-
-            <View style={styles.statTile}>
-              <Text style={styles.statTileValue}>
-                {Math.round(macros.carbs)}g
-              </Text>
-              <Text style={styles.statTileLabel}>Carbs</Text>
+            <View style={styles.nutritionItem}>
+              <Text style={styles.nutritionValue}>{Math.round(macros.carbs)}g</Text>
+              <Text style={styles.nutritionLabel}>Carbs</Text>
             </View>
-
-            <View style={styles.statTile}>
-              <Text style={styles.statTileValue}>
-                {Math.round(macros.fat)}g
-              </Text>
-              <Text style={styles.statTileLabel}>Fat</Text>
+            <View style={styles.nutritionItem}>
+              <Text style={styles.nutritionValue}>{Math.round(macros.fat)}g</Text>
+              <Text style={styles.nutritionLabel}>Fat</Text>
             </View>
-
-            <View style={[styles.statTile, styles.statTileWide]}>
-              <Text style={styles.statTileValue}>
-                {Math.round(macros.fiber)}g
-              </Text>
-              <Text style={styles.statTileLabel}>Fiber</Text>
-            </View>
+          </View>
+          <View style={styles.fiberChip}>
+            <Text style={styles.fiberChipLabel}>Fiber</Text>
+            <Text style={styles.fiberChipValue}>{Math.round(macros.fiber)}g</Text>
           </View>
         </View>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeadingRow}>
-            <View>
-              <Text style={styles.sectionKicker}>Breakdown</Text>
-              <Text style={styles.sectionTitle}>Ingredients detected</Text>
-            </View>
+        {/* Ingredients */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Ingredients Detected</Text>
             <View style={styles.countPill}>
               <Text style={styles.countPillText}>{ingredients.length}</Text>
             </View>
           </View>
-
-          <View style={styles.ingredientsList}>
+          <View style={styles.ingredientList}>
             {ingredients.map((ingredient, index) => (
-              <View key={index} style={styles.ingredientRowCard}>
-                <View style={styles.ingredientMarker}>
-                  <Text style={styles.ingredientEmoji}>
-                    {ingredient.icon || "🍽️"}
-                  </Text>
+              <View
+                key={index}
+                style={[styles.ingredientItem, index !== 0 && styles.ingredientItemDivider]}
+              >
+                <View style={styles.ingredientIconShell}>
+                  <Text style={styles.ingredientEmoji}>{ingredient.icon || "🍽️"}</Text>
                 </View>
-
-                <View style={styles.ingredientBody}>
-                  <Text style={styles.ingredientNameText}>
-                    {ingredient.name}
-                  </Text>
-                  <Text style={styles.ingredientQuantity}>
-                    {ingredient.amount}
-                  </Text>
+                <View style={styles.ingredientInfo}>
+                  <Text style={styles.ingredientName}>{ingredient.name}</Text>
+                  <Text style={styles.ingredientQuantity}>{ingredient.amount}</Text>
                 </View>
-
-                <View style={styles.ingredientMeta}>
-                  <Text style={styles.ingredientCalories}>
-                    {ingredient.calories || 0}
-                  </Text>
+                <View style={styles.ingredientCaloriesWrap}>
+                  <Text style={styles.ingredientCalories}>{ingredient.calories || 0}</Text>
                   <Text style={styles.ingredientCaloriesLabel}>kcal</Text>
                 </View>
               </View>
@@ -1241,71 +1201,58 @@ The JSON object must have this structure:
           </View>
         </View>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeadingRow}>
-            <View>
-              <Text style={styles.sectionKicker}>Check-in</Text>
-              <Text style={styles.sectionTitle}>How are you feeling?</Text>
-            </View>
-          </View>
-
+        {/* Mood Selection */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>How are you feeling?</Text>
           <View style={styles.moodGrid}>
             {moodOptions.map((mood, index) => (
               <TouchableOpacity
                 key={index}
-                style={[
-                  styles.moodOption,
-                  selectedMood === index && styles.selectedMood,
-                ]}
-                onPress={() =>
-                  setSelectedMood(selectedMood === index ? null : index)
-                }
+                style={[styles.moodOption, selectedMood === index && styles.selectedMood]}
+                onPress={() => setSelectedMood(selectedMood === index ? null : index)}
+                activeOpacity={0.85}
               >
                 <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-                <Text style={styles.moodLabel}>{mood.label}</Text>
+                <Text style={[styles.moodLabel, selectedMood === index && styles.moodLabelActive]}>
+                  {mood.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
       </ScrollView>
 
+      {/* Action Buttons */}
       <View
         style={[
-          styles.actionBar,
-          { paddingBottom: insets.bottom >= 20 ? insets.bottom + 16 : 18 },
+          styles.actionContainer,
+          { paddingBottom: insets.bottom >= 20 ? insets.bottom + 20 : 20 },
         ]}
       >
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleSave}
           disabled={saving}
+          activeOpacity={0.85}
         >
           <Ionicons
             name={saving ? "time-outline" : "bookmark-outline"}
-            size={18}
-            color={styles.$saveIcon}
+            size={19}
+            color={palette.primary}
           />
-          <Text style={styles.saveButtonText}>
-            {saving ? "Saving..." : "Save"}
-          </Text>
+          <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save Meal"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.confirmButton}
           onPress={handleDone}
           disabled={logging}
+          activeOpacity={0.9}
         >
           {logging ? (
-            <ActivityIndicator size="small" color={styles.$buttonTextOnDark} />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <>
-              <Text style={styles.confirmButtonText}>Log Food</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={18}
-                color={styles.$buttonTextOnDark}
-              />
-            </>
+            <Text style={styles.confirmButtonText}>Log Food</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -1313,626 +1260,398 @@ The JSON object must have this structure:
   );
 };
 
-const createStyles = (colors, isDark) => {
-  const palette = {
-    primary: "#1F4E4A",
-    primarySoft: "#2A625C",
-    mint: "#A8D5CE",
-    bg: "#F4FBFA",
-    surface: "#FFFFFF",
-    surfaceSoft: "#EEF7F5",
-    border: "#D6E8E3",
-    text: "#173A37",
-    textSoft: "#5E7A76",
-    textFaint: "#86A5A0",
-    darkSurface: "#173A37",
-    darkTextOnPrimary: "#F4FBFA",
-    successTint: "#DDEFEA",
-    shadow: "rgba(31, 78, 74, 0.12)",
-  };
-
-  const adaptiveBg = isDark ? "#0F2624" : palette.bg;
-  const adaptiveSurface = isDark ? "#16312F" : palette.surface;
-  const adaptiveSurfaceSoft = isDark ? "#1C3B38" : palette.surfaceSoft;
-  const adaptiveText = isDark ? "#EAF7F4" : palette.text;
-  const adaptiveTextSoft = isDark ? "#A9C4BF" : palette.textSoft;
-  const adaptiveBorder = isDark ? "rgba(168, 213, 206, 0.16)" : palette.border;
-  const adaptivePrimary = palette.primary;
-  const adaptivePrimarySoft = isDark ? "#285954" : palette.primarySoft;
-  const adaptiveMint = isDark ? "#7FB9AF" : palette.mint;
-
-  return StyleSheet.create({
-    $iconColor: adaptiveText,
-    $iconMuted: adaptiveTextSoft,
-    $pillIcon: adaptivePrimary,
-    $placeholderColor: adaptiveTextSoft,
-    $buttonTextOnDark: palette.darkTextOnPrimary,
-    $saveIcon: adaptivePrimary,
-
+const createStyles = (palette, isDark) =>
+  StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: adaptiveBg,
+      backgroundColor: palette.background,
     },
-
     content: {
       flex: 1,
-      backgroundColor: adaptiveBg,
+      backgroundColor: palette.background,
     },
 
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      paddingTop: 8,
-      paddingBottom: 16,
-      backgroundColor: adaptiveBg,
-    },
-
-    iconButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: adaptiveSurface,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    iconButtonGhost: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: adaptiveSurfaceSoft,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    headerCenter: {
-      flex: 1,
-      alignItems: "center",
-      paddingHorizontal: 12,
-    },
-
-    headerEyebrow: {
-      fontSize: 11,
-      fontWeight: "700",
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: adaptiveTextSoft,
-      marginBottom: 3,
-    },
-
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: adaptiveText,
-    },
-
+    // Hero header
     heroCard: {
-      marginHorizontal: 18,
-      marginTop: 6,
-      marginBottom: 18,
-      backgroundColor: adaptiveSurface,
-      borderRadius: 28,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: isDark ? 0.16 : 0.08,
-      shadowRadius: 22,
-      elevation: 8,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+      paddingBottom: 6,
     },
-
     heroTopRow: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      marginBottom: 14,
     },
-
-    heroLabelPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-      borderRadius: 999,
-      backgroundColor: adaptiveSurfaceSoft,
+    heroBackBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 16,
+      backgroundColor: palette.card,
       borderWidth: 1,
-      borderColor: adaptiveBorder,
+      borderColor: palette.border,
+      alignItems: "center",
+      justifyContent: "center",
     },
-
-    heroLabelText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: adaptivePrimary,
+    heroTitle: {
+      fontSize: 19,
+      fontFamily: "Lexend-Bold",
+      color: palette.textPrimary,
     },
+    heroSpacer: { width: 40 },
 
-    heroTimeText: {
-      fontSize: 12,
-      fontWeight: "600",
-      color: adaptiveTextSoft,
-    },
-
-    photoShell: {
+    // Photo
+    photoContainer: {
       position: "relative",
+      marginTop: 12,
+      marginBottom: 16,
       borderRadius: 24,
       overflow: "hidden",
-      marginBottom: 16,
-      backgroundColor: adaptiveSurfaceSoft,
     },
-
     photo: {
       width: "100%",
-      height: 220,
+      height: 200,
     },
-
-    photoOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(31, 78, 74, 0.08)",
-    },
-
-    heroCalorieBadge: {
+    calorieBadge: {
       position: "absolute",
       right: 14,
       bottom: 14,
-      width: 84,
-      height: 84,
-      borderRadius: 42,
-      backgroundColor: "rgba(244, 251, 250, 0.92)",
+      width: 68,
+      height: 68,
+      borderRadius: 22,
+      backgroundColor: isDark ? "rgba(23,48,45,0.92)" : "rgba(255,255,255,0.94)",
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
-      borderColor: "rgba(31, 78, 74, 0.12)",
+      borderColor: palette.border,
     },
-
-    heroCalorieValue: {
-      fontSize: 22,
-      fontWeight: "800",
-      color: adaptivePrimary,
-      lineHeight: 24,
+    calorieBadgeValue: {
+      fontSize: 18,
+      fontFamily: "Lexend-Bold",
+      color: palette.primary,
+      lineHeight: 20,
     },
-
-    heroCalorieLabel: {
-      fontSize: 11,
-      fontWeight: "700",
-      color: adaptiveTextSoft,
-      marginTop: 2,
+    calorieBadgeLabel: {
+      fontSize: 10,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
       textTransform: "uppercase",
-      letterSpacing: 0.7,
+      letterSpacing: 0.5,
     },
 
-    heroTextBlock: {
-      paddingHorizontal: 4,
+    // Generic card
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 24,
+      padding: 18,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: isDark ? 0.3 : 0.06,
+      shadowRadius: 14,
+      elevation: 3,
     },
-
-    heroTitle: {
-      fontSize: 13,
-      fontWeight: "700",
-      letterSpacing: 0.7,
-      textTransform: "uppercase",
-      color: adaptiveTextSoft,
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: 10,
     },
-
-    heroEditRow: {
+    sectionTitle: {
+      fontSize: 16,
+      fontFamily: "Lexend-Bold",
+      color: palette.textPrimary,
+      marginBottom: 10,
+    },
+    editActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginBottom: -10,
+    },
+    iconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    foodName: {
+      fontSize: 17,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.textPrimary,
       marginBottom: 8,
     },
-
-    heroNameRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
+    editableText: {
+      borderBottomWidth: 1.5,
+      borderBottomColor: palette.primary,
+      paddingVertical: 4,
     },
-
-    foodNameDisplay: {
-      flex: 1,
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: "800",
-      color: adaptiveText,
-    },
-
-    editFab: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: adaptiveSurfaceSoft,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    editInputWrap: {
-      gap: 10,
-    },
-
-    foodNameInput: {
-      fontSize: 24,
-      fontWeight: "800",
-      color: adaptiveText,
-      backgroundColor: adaptiveSurfaceSoft,
-      borderRadius: 18,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    inputError: {
-      borderColor: "#C95E5E",
-    },
-
-    inlineActions: {
-      flexDirection: "row",
-      gap: 10,
-    },
-
-    inlineActionPrimary: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: adaptivePrimary,
-    },
-
-    inlineActionSecondary: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: adaptiveSurfaceSoft,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
     errorText: {
-      marginTop: 8,
       fontSize: 12,
-      color: "#C95E5E",
-      fontWeight: "600",
+      fontFamily: "Manrope-SemiBold",
+      color: palette.destructive,
+      marginBottom: 8,
+    },
+    confidenceChip: {
+      alignSelf: "flex-start",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    confidenceText: {
+      fontSize: 12,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
     },
 
-    heroSubText: {
-      fontSize: 14,
-      color: adaptiveTextSoft,
-      fontWeight: "600",
-    },
-
-    metricsRow: {
-      marginHorizontal: 18,
-      marginBottom: 18,
-    },
-
-    healthPanel: {
-      backgroundColor: adaptivePrimary,
-      borderRadius: 26,
-      padding: 18,
+    // Health score card
+    healthCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 16,
-      shadowColor: palette.primary,
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.18,
-      shadowRadius: 20,
-      elevation: 10,
-    },
-
-    healthRing: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: "rgba(244, 251, 250, 0.16)",
-      borderWidth: 1,
-      borderColor: "rgba(244, 251, 250, 0.22)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-
-    healthRingValue: {
-      fontSize: 24,
-      fontWeight: "800",
-      color: palette.darkTextOnPrimary,
-    },
-
-    healthPanelText: {
-      flex: 1,
-    },
-
-    healthPanelTitle: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: palette.darkTextOnPrimary,
-      marginBottom: 4,
-    },
-
-    healthPanelDesc: {
-      fontSize: 13,
-      lineHeight: 19,
-      color: "rgba(244, 251, 250, 0.86)",
-    },
-
-    sectionCardLarge: {
-      marginHorizontal: 18,
-      marginBottom: 18,
-      backgroundColor: adaptiveSurface,
-      borderRadius: 26,
+      backgroundColor: palette.primary,
+      borderRadius: 24,
       padding: 18,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    sectionCard: {
-      marginHorizontal: 18,
-      marginBottom: 18,
-      backgroundColor: adaptiveSurface,
-      borderRadius: 26,
-      padding: 18,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    sectionHeadingRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
       marginBottom: 16,
-      gap: 12,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.18,
+      shadowRadius: 18,
+      elevation: 6,
     },
-
-    sectionKicker: {
-      fontSize: 11,
-      fontWeight: "700",
-      letterSpacing: 1,
-      textTransform: "uppercase",
-      color: adaptiveTextSoft,
-      marginBottom: 4,
-    },
-
-    sectionTitle: {
-      fontSize: 22,
-      fontWeight: "800",
-      color: adaptiveText,
-    },
-
-    summaryChip: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 999,
-      backgroundColor: adaptiveSurfaceSoft,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    summaryChipText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: adaptivePrimary,
-    },
-
-    nutritionGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-
-    statTile: {
-      width: "47%",
-      backgroundColor: adaptiveSurfaceSoft,
-      borderRadius: 22,
-      paddingVertical: 18,
-      paddingHorizontal: 14,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    statTilePrimary: {
-      backgroundColor: adaptivePrimary,
-      borderColor: adaptivePrimary,
-    },
-
-    statTileWide: {
-      width: "100%",
-      backgroundColor: isDark ? adaptivePrimarySoft : palette.successTint,
-    },
-
-    statTileValue: {
-      fontSize: 24,
-      fontWeight: "800",
-      color: adaptiveText,
-      marginBottom: 6,
-    },
-
-    statTileLabel: {
-      fontSize: 13,
-      fontWeight: "700",
-      color: adaptiveTextSoft,
-    },
-
-    ingredientsList: {
-      gap: 12,
-    },
-
-    ingredientRowCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: adaptiveSurfaceSoft,
+    healthRing: {
+      width: 60,
+      height: 60,
       borderRadius: 20,
-      padding: 14,
+      backgroundColor: "rgba(255,255,255,0.16)",
       borderWidth: 1,
-      borderColor: adaptiveBorder,
-    },
-
-    ingredientMarker: {
-      width: 46,
-      height: 46,
-      borderRadius: 16,
+      borderColor: "rgba(255,255,255,0.24)",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: adaptiveSurface,
-      marginRight: 12,
-      borderWidth: 1,
-      borderColor: adaptiveBorder,
+      marginRight: 14,
     },
-
-    ingredientEmoji: {
-      fontSize: 22,
+    healthRingValue: {
+      fontSize: 20,
+      fontFamily: "Lexend-Bold",
+      color: "#FFFFFF",
     },
-
-    ingredientBody: {
+    healthTextWrap: {
       flex: 1,
     },
-
-    ingredientNameText: {
+    healthTitle: {
       fontSize: 16,
-      fontWeight: "700",
-      color: adaptiveText,
+      fontFamily: "Lexend-Bold",
+      color: "#FFFFFF",
       marginBottom: 3,
     },
-
-    ingredientQuantity: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: adaptiveTextSoft,
+    healthDesc: {
+      fontSize: 12.5,
+      fontFamily: "Manrope-Regular",
+      color: "rgba(244, 251, 250, 0.85)",
+      lineHeight: 18,
     },
 
-    ingredientMeta: {
-      alignItems: "flex-end",
-      marginLeft: 10,
+    // Nutrition grid
+    nutritionGrid: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 18,
+      padding: 14,
     },
-
-    ingredientCalories: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: adaptivePrimary,
+    nutritionItem: {
+      alignItems: "center",
+      flex: 1,
     },
-
-    ingredientCaloriesLabel: {
+    nutritionValue: {
+      fontSize: 18,
+      fontFamily: "Lexend-Bold",
+      color: palette.primary,
+    },
+    nutritionLabel: {
       fontSize: 11,
-      fontWeight: "700",
-      color: adaptiveTextSoft,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
+      marginTop: 4,
       textTransform: "uppercase",
-      letterSpacing: 0.7,
+      letterSpacing: 0.4,
+    },
+    fiberChip: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginTop: 10,
+    },
+    fiberChipLabel: {
+      fontSize: 12,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
+    },
+    fiberChipValue: {
+      fontSize: 14,
+      fontFamily: "Lexend-Bold",
+      color: palette.primary,
     },
 
+    // Ingredients
     countPill: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 26,
+      height: 26,
+      borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: adaptivePrimary,
+      backgroundColor: palette.primary,
+      marginBottom: -10,
     },
-
     countPillText: {
-      fontSize: 13,
-      fontWeight: "800",
-      color: palette.darkTextOnPrimary,
+      fontSize: 12,
+      fontFamily: "Lexend-Bold",
+      color: "#FFFFFF",
+    },
+    ingredientList: {
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+    },
+    ingredientItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    ingredientItemDivider: {
+      borderTopWidth: 1,
+      borderTopColor: palette.border,
+    },
+    ingredientIconShell: {
+      width: 34,
+      height: 34,
+      borderRadius: 12,
+      backgroundColor: palette.card,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    ingredientEmoji: {
+      fontSize: 16,
+    },
+    ingredientInfo: {
+      flex: 1,
+      paddingRight: 8,
+    },
+    ingredientName: {
+      fontSize: 14,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.textPrimary,
+      marginBottom: 2,
+    },
+    ingredientQuantity: {
+      fontSize: 12,
+      fontFamily: "Manrope-Regular",
+      color: palette.textSecondary,
+    },
+    ingredientCaloriesWrap: {
+      alignItems: "flex-end",
+    },
+    ingredientCalories: {
+      fontSize: 14,
+      fontFamily: "Lexend-Bold",
+      color: palette.primary,
+    },
+    ingredientCaloriesLabel: {
+      fontSize: 10,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
     },
 
+    // Mood grid
     moodGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
+      gap: 10,
     },
-
     moodOption: {
-      width: "31%",
-      backgroundColor: adaptiveSurfaceSoft,
-      borderRadius: 22,
+      width: "30%",
       alignItems: "center",
-      paddingVertical: 16,
-      paddingHorizontal: 8,
-      marginBottom: 12,
+      paddingVertical: 14,
+      borderRadius: 18,
+      backgroundColor: palette.cardSecondary,
       borderWidth: 1,
-      borderColor: adaptiveBorder,
+      borderColor: palette.border,
     },
-
     selectedMood: {
-      backgroundColor: isDark ? adaptivePrimarySoft : "#E3F2EF",
-      borderColor: adaptivePrimary,
-      borderWidth: 2,
-      transform: [{ scale: 1.02 }],
+      backgroundColor: palette.selectedCard,
+      borderColor: palette.primary,
     },
-
     moodEmoji: {
-      fontSize: 28,
-      marginBottom: 8,
+      fontSize: 24,
+      marginBottom: 6,
     },
-
     moodLabel: {
       fontSize: 12,
-      fontWeight: "700",
-      color: adaptiveTextSoft,
-      textAlign: "center",
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
+    },
+    moodLabelActive: {
+      color: palette.primary,
+      fontFamily: "Lexend-SemiBold",
     },
 
-    actionBar: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: 0,
+    // Action buttons
+    actionContainer: {
       flexDirection: "row",
-      alignItems: "center",
       paddingHorizontal: 18,
       paddingTop: 14,
-      backgroundColor: adaptiveBg,
       borderTopWidth: 1,
-      borderTopColor: adaptiveBorder,
-      gap: 12,
+      borderTopColor: palette.border,
+      backgroundColor: palette.background,
     },
-
     saveButton: {
       flex: 1,
-      height: 56,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: palette.cardSecondary,
       borderRadius: 18,
-      backgroundColor: adaptiveSurface,
+      paddingVertical: 15,
+      marginRight: 12,
       borderWidth: 1,
-      borderColor: adaptiveBorder,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
+      borderColor: palette.border,
     },
-
     saveButtonText: {
+      marginLeft: 6,
       fontSize: 15,
-      fontWeight: "800",
-      color: adaptivePrimary,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.primary,
     },
-
     confirmButton: {
-      flex: 1.6,
-      height: 56,
+      flex: 1.4,
+      backgroundColor: palette.primary,
       borderRadius: 18,
-      backgroundColor: adaptivePrimary,
-      flexDirection: "row",
+      paddingVertical: 15,
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
-      shadowColor: palette.primary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.16,
-      shadowRadius: 18,
-      elevation: 8,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.14,
+      shadowRadius: 12,
+      elevation: 4,
     },
-
     confirmButtonText: {
       fontSize: 15,
-      fontWeight: "800",
-      color: palette.darkTextOnPrimary,
+      fontFamily: "Lexend-SemiBold",
+      color: "#FFFFFF",
     },
   });
-};
 
 export default PostCalorieScreen;

@@ -46,7 +46,7 @@ const ManualLogScreen = ({ route, navigation }) => {
     setIsLoading(true);
     setAnalysis(null);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
       const prompt = `
         Analyze the food described in this text: "${foodQuery}".
         Your response MUST be a valid JSON object and nothing else.
@@ -207,7 +207,7 @@ IMPORTANT: Provide realistic fiber values based on the food type:
 - Processed foods: 0-2g fiber per serving
 
 EXAMPLE: If user enters "200g black beans", calculate nutrition for exactly 200g, not for a standard serving size.`;
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
