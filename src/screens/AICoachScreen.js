@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,6 +60,183 @@ const formatRelativeDate = (isoString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+// ─── FormattedText: Lightweight Markdown Renderer ──────────────────────────────
+// Handles: ## headings, **bold**, `code`, - bullets, 1. numbered, --- dividers
+const FormattedText = ({ text, textColor, isDarkMode }) => {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+
+  // Parse inline bold and inline code within a string
+  const parseInline = (str, baseStyle, key) => {
+    // Split on **bold** and `code`
+    const parts = str.split(/(\*\*.*?\*\*|`[^`]+`)/);
+    return (
+      <Text key={key} style={baseStyle}>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={i} style={[baseStyle, { fontFamily: 'Manrope-Bold' }]}>
+                {part.slice(2, -2)}
+              </Text>
+            );
+          }
+          if (part.startsWith('`') && part.endsWith('`')) {
+            return (
+              <Text
+                key={i}
+                style={[
+                  baseStyle,
+                  {
+                    fontFamily: 'Manrope-Regular',
+                    backgroundColor: isDarkMode ? '#0A1A18' : '#E8F4F2',
+                    color: isDarkMode ? '#7ECDC4' : '#1A5C57',
+                    borderRadius: 4,
+                    paddingHorizontal: 4,
+                  },
+                ]}
+              >
+                {part.slice(1, -1)}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  };
+
+  const baseTextStyle = {
+    fontSize: 15,
+    fontFamily: 'Manrope-Regular',
+    lineHeight: 22,
+    color: textColor,
+  };
+
+  const elements = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Skip blank lines between blocks (add small gap)
+    if (trimmed === '') {
+      elements.push(<View key={`gap-${i}`} style={{ height: 4 }} />);
+      i++;
+      continue;
+    }
+
+    // Horizontal rule ---
+    if (/^-{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed)) {
+      elements.push(
+        <View
+          key={`hr-${i}`}
+          style={{
+            height: 1,
+            backgroundColor: isDarkMode ? '#2C4A46' : '#D7EAE6',
+            marginVertical: 8,
+          }}
+        />
+      );
+      i++;
+      continue;
+    }
+
+    // H1: # Heading
+    if (/^# /.test(trimmed)) {
+      elements.push(
+        <Text
+          key={`h1-${i}`}
+          style={[baseTextStyle, { fontFamily: 'Lexend-Bold', fontSize: 17, marginBottom: 4, marginTop: 6 }]}
+        >
+          {trimmed.replace(/^# /, '')}
+        </Text>
+      );
+      i++;
+      continue;
+    }
+
+    // H2: ## Heading
+    if (/^## /.test(trimmed)) {
+      elements.push(
+        <Text
+          key={`h2-${i}`}
+          style={[baseTextStyle, { fontFamily: 'Lexend-Bold', fontSize: 15.5, marginBottom: 4, marginTop: 6 }]}
+        >
+          {trimmed.replace(/^## /, '')}
+        </Text>
+      );
+      i++;
+      continue;
+    }
+
+    // H3: ### Heading
+    if (/^### /.test(trimmed)) {
+      elements.push(
+        <Text
+          key={`h3-${i}`}
+          style={[baseTextStyle, { fontFamily: 'Manrope-Bold', fontSize: 15, marginBottom: 3, marginTop: 4 }]}
+        >
+          {trimmed.replace(/^### /, '')}
+        </Text>
+      );
+      i++;
+      continue;
+    }
+
+    // Bullet: - item or * item
+    if (/^[-*] /.test(trimmed)) {
+      const content = trimmed.replace(/^[-*] /, '');
+      elements.push(
+        <View key={`bullet-${i}`} style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 4 }}>
+          <Text style={[baseTextStyle, { marginRight: 8, marginTop: 1 }]}>•</Text>
+          {parseInline(content, baseTextStyle, `bullet-text-${i}`)}
+        </View>
+      );
+      i++;
+      continue;
+    }
+
+    // Numbered list: 1. item
+    if (/^\d+\. /.test(trimmed)) {
+      const num = trimmed.match(/^(\d+)\. /)[1];
+      const content = trimmed.replace(/^\d+\. /, '');
+      elements.push(
+        <View key={`num-${i}`} style={{ flexDirection: 'row', marginBottom: 3, paddingLeft: 4 }}>
+          <Text style={[baseTextStyle, { marginRight: 6, minWidth: 20 }]}>{num}.</Text>
+          {parseInline(content, baseTextStyle, `num-text-${i}`)}
+        </View>
+      );
+      i++;
+      continue;
+    }
+
+    // Sub-bullet: two or four spaces + - or *
+    if (/^  [-*] /.test(line) || /^    [-*] /.test(line)) {
+      const content = trimmed.replace(/^[-*] /, '');
+      elements.push(
+        <View key={`sub-${i}`} style={{ flexDirection: 'row', marginBottom: 2, paddingLeft: 20 }}>
+          <Text style={[baseTextStyle, { marginRight: 8, fontSize: 13, marginTop: 2 }]}>◦</Text>
+          {parseInline(content, { ...baseTextStyle, fontSize: 14 }, `sub-text-${i}`)}
+        </View>
+      );
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <View key={`p-${i}`} style={{ marginBottom: 2 }}>
+        {parseInline(trimmed, baseTextStyle, `p-text-${i}`)}
+      </View>
+    );
+    i++;
+  }
+
+  return <View>{elements}</View>;
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AICoachScreen({ navigation }) {
   const { colors, isDark } = useTheme();
@@ -89,6 +267,24 @@ export default function AICoachScreen({ navigation }) {
   useEffect(() => {
     sessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
+
+  // ─── Android: manual keyboard height tracking ────────────────────────────
+  // KAV behavior='padding' on Android leaves residual space after dismiss.
+  // Listening to keyboard events and using marginBottom is perfectly reliable.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // ─── Supabase: Load User Context ─────────────────────────────────────────
   const loadUserContext = async () => {
@@ -454,16 +650,17 @@ Use this memory to provide continuity and more personalized advice. Do not expli
               },
         ]}
       >
-        <Text
-          style={[
-            styles.messageText,
-            item.isUser
-              ? { color: '#FFFFFF' }
-              : { color: isDark ? '#F4FBFA' : '#173A37' },
-          ]}
-        >
-          {item.text}
-        </Text>
+        {item.isUser ? (
+          <Text style={[styles.messageText, { color: '#FFFFFF' }]}>
+            {item.text}
+          </Text>
+        ) : (
+          <FormattedText
+            text={item.text}
+            textColor={isDark ? '#F4FBFA' : '#173A37'}
+            isDarkMode={isDark}
+          />
+        )}
       </View>
     </View>
   );
@@ -572,64 +769,132 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       )}
 
       {/* Chat + Input */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={[styles.chatContainer, { paddingBottom: 24 }]}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          showsVerticalScrollIndicator={false}
-        />
-
-        <View
-          style={[
-            styles.inputContainer,
-            {
-              backgroundColor: isDark ? '#17302D' : '#FFFFFF',
-              borderTopColor: isDark ? '#2C4A46' : '#D7EAE6',
-              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 16,
-            },
-          ]}
-        >
-          <TextInput
+      {Platform.OS === 'ios' ? (
+        // iOS: native KeyboardAvoidingView padding works perfectly
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={[styles.chatContainer, { paddingBottom: 24 }]}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            />
+          </TouchableWithoutFeedback>
+          <View
             style={[
-              styles.textInput,
+              styles.inputContainer,
               {
-                backgroundColor: isDark ? '#0F1E1C' : '#F4FBFA',
-                color: isDark ? '#F4FBFA' : '#173A37',
-                borderColor: isDark ? '#2C4A46' : '#D7EAE6',
+                backgroundColor: isDark ? '#17302D' : '#FFFFFF',
+                borderTopColor: isDark ? '#2C4A46' : '#D7EAE6',
+                paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
-            placeholder="Ask about calories, meals, or advice..."
-            placeholderTextColor={isDark ? '#8FAAA5' : '#5E7D78'}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && { opacity: 0.5 },
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || isLoading}
-            activeOpacity={0.8}
           >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Ionicons name="send" size={18} color="#FFFFFF" />
-            )}
-          </TouchableOpacity>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: isDark ? '#0F1E1C' : '#F4FBFA',
+                  color: isDark ? '#F4FBFA' : '#173A37',
+                  borderColor: isDark ? '#2C4A46' : '#D7EAE6',
+                },
+              ]}
+              placeholder="Ask about calories, meals, or advice..."
+              placeholderTextColor={isDark ? '#8FAAA5' : '#5E7D78'}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && { opacity: 0.5 },
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      ) : (
+        // Android: marginBottom tracks exact keyboard height via events.
+        // Resets to 0 perfectly when keyboard closes — no residual gap.
+        <View style={{ flex: 1, marginBottom: keyboardHeight }}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={[styles.chatContainer, { paddingBottom: 24 }]}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: isDark ? '#17302D' : '#FFFFFF',
+                borderTopColor: isDark ? '#2C4A46' : '#D7EAE6',
+                paddingBottom: 16,
+              },
+            ]}
+          >
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: isDark ? '#0F1E1C' : '#F4FBFA',
+                  color: isDark ? '#F4FBFA' : '#173A37',
+                  borderColor: isDark ? '#2C4A46' : '#D7EAE6',
+                },
+              ]}
+              placeholder="Ask about calories, meals, or advice..."
+              placeholderTextColor={isDark ? '#8FAAA5' : '#5E7D78'}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && { opacity: 0.5 },
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </KeyboardAvoidingView>
+      )}
 
       {/* History Modal */}
       <Modal
