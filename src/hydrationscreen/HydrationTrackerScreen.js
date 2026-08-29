@@ -19,7 +19,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import Svg, { Circle } from "react-native-svg";
+
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 
@@ -38,7 +38,7 @@ const RING_SIZE = CIRCLE_SIZE + RING_GAP * 2 + RING_STROKE;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 
 const HydrationTrackerScreen = () => {
   const navigation = useNavigation();
@@ -1061,32 +1061,6 @@ const HydrationTrackerScreen = () => {
           <View style={styles.innerContainer}>
             {/* Circular water gauge */}
             <View style={styles.gaugeWrap}>
-              <Svg width={RING_SIZE} height={RING_SIZE} style={styles.ringSvg}>
-                {/* Track */}
-                <Circle
-                  cx={RING_SIZE / 2}
-                  cy={RING_SIZE / 2}
-                  r={RING_RADIUS}
-                  stroke={palette.ringTrack}
-                  strokeWidth={RING_STROKE}
-                  fill="none"
-                />
-                {/* Progress — same % as the water fill */}
-                <AnimatedCircle
-                  cx={RING_SIZE / 2}
-                  cy={RING_SIZE / 2}
-                  r={RING_RADIUS}
-                  stroke={palette.primary}
-                  strokeWidth={RING_STROKE}
-                  fill="none"
-                  strokeDasharray={`${RING_CIRCUMFERENCE}, ${RING_CIRCUMFERENCE}`}
-                  strokeDashoffset={ringStrokeDashoffset}
-                  strokeLinecap="round"
-                  rotation="-90"
-                  origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
-                />
-              </Svg>
-
               <View style={styles.waterCircle}>
                 {/* Empty (air) backdrop */}
                 <View style={styles.waterCircleBackdrop} />
@@ -1101,15 +1075,35 @@ const HydrationTrackerScreen = () => {
                   style={styles.waterTextContainer}
                   pointerEvents="box-none"
                 >
-                  <Text style={styles.waterAmount}>
-                    {currentIntake.toFixed(2)}L
-                  </Text>
-                  <Text style={styles.waterGoal}>of {dailyGoal}L</Text>
-                  <Text style={styles.hydrated}>
-                    {Math.round(progress)}% Hydrated
-                  </Text>
+                  <View style={{ position: 'relative' }}>
+                    <Text style={[styles.waterAmount, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: -1 }, textShadowRadius: 1 }]}>{currentIntake.toFixed(2)}L</Text>
+                    <Text style={[styles.waterAmount, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: -1 }, textShadowRadius: 1 }]}>{currentIntake.toFixed(2)}L</Text>
+                    <Text style={[styles.waterAmount, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 1 }]}>{currentIntake.toFixed(2)}L</Text>
+                    <Text style={[styles.waterAmount, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 }]}>{currentIntake.toFixed(2)}L</Text>
+                    <Text style={styles.waterAmount}>{currentIntake.toFixed(2)}L</Text>
+                  </View>
+                  <View style={{ position: 'relative' }}>
+                    <Text style={[styles.waterGoal, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: -1 }, textShadowRadius: 1 }]}>of {dailyGoal}L</Text>
+                    <Text style={[styles.waterGoal, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: -1 }, textShadowRadius: 1 }]}>of {dailyGoal}L</Text>
+                    <Text style={[styles.waterGoal, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 1 }]}>of {dailyGoal}L</Text>
+                    <Text style={[styles.waterGoal, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 }]}>of {dailyGoal}L</Text>
+                    <Text style={styles.waterGoal}>of {dailyGoal}L</Text>
+                  </View>
+                  <View style={{ position: 'relative' }}>
+                    <Text style={[styles.hydrated, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: -1 }, textShadowRadius: 1 }]}>{Math.round(progress)}% Hydrated</Text>
+                    <Text style={[styles.hydrated, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: -1 }, textShadowRadius: 1 }]}>{Math.round(progress)}% Hydrated</Text>
+                    <Text style={[styles.hydrated, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 1 }]}>{Math.round(progress)}% Hydrated</Text>
+                    <Text style={[styles.hydrated, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 }]}>{Math.round(progress)}% Hydrated</Text>
+                    <Text style={styles.hydrated}>{Math.round(progress)}% Hydrated</Text>
+                  </View>
                   {isGoalAchieved && (
-                    <Text style={styles.goalAchieved}>🎉 Goal Achieved!</Text>
+                    <View style={{ position: 'relative' }}>
+                      <Text style={[styles.goalAchieved, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: -1 }, textShadowRadius: 1 }]}>🎉 Goal Achieved!</Text>
+                      <Text style={[styles.goalAchieved, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: -1 }, textShadowRadius: 1 }]}>🎉 Goal Achieved!</Text>
+                      <Text style={[styles.goalAchieved, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 1 }]}>🎉 Goal Achieved!</Text>
+                      <Text style={[styles.goalAchieved, { position: 'absolute', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 1 }]}>🎉 Goal Achieved!</Text>
+                      <Text style={styles.goalAchieved}>🎉 Goal Achieved!</Text>
+                    </View>
                   )}
                   <View
                     style={styles.buttonRowInsideFill}
@@ -1441,9 +1435,7 @@ const createStyles = (palette, isDark) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    ringSvg: {
-      position: "absolute",
-    },
+
     waterCircle: {
       width: CIRCLE_SIZE,
       height: CIRCLE_SIZE,
@@ -1482,7 +1474,7 @@ const createStyles = (palette, isDark) =>
     waterAmount: {
       fontSize: 26,
       fontFamily: "Lexend-Bold",
-      color: "#ffffff",
+      color: "#ffffffa3",
       textShadowColor: "rgba(0, 0, 0, 0.35)",
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 3,
@@ -1490,16 +1482,16 @@ const createStyles = (palette, isDark) =>
     waterGoal: {
       fontSize: 14,
       fontFamily: "Manrope-Medium",
-      color: "#ffffff",
+      color: "#ffffffa3",
+      marginBottom: 2,
       textShadowColor: "rgba(0, 0, 0, 0.35)",
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 3,
-      marginBottom: 2,
     },
     hydrated: {
       fontSize: 15,
       fontFamily: "Lexend-SemiBold",
-      color: "#ffffff",
+      color: "#ffffffa3",
       marginVertical: 4,
       textShadowColor: "rgba(0, 0, 0, 0.35)",
       textShadowOffset: { width: 0, height: 1 },
