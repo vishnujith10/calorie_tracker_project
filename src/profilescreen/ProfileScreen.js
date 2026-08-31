@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useState } from "react";
@@ -410,18 +411,30 @@ const ProfileScreen = () => {
 
       const fileName = `${user.id}/${Date.now()}.jpg`;
 
-      const response = await fetch(imageUri);
-      const arrayBuffer = await response.arrayBuffer();
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+      const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
 
-      const { error: uploadError } = await supabase.storage
-        .from("profile-photos")
-        .upload(fileName, arrayBuffer, {
-          contentType: "image/jpeg",
-          upsert: false,
-        });
+      if (!authToken) throw new Error("No auth token available");
 
-      if (uploadError) {
-        throw uploadError;
+      const uploadResult = await FileSystem.uploadAsync(
+        `${supabaseUrl}/storage/v1/object/profile-photos/${fileName}`,
+        imageUri,
+        {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            apikey: supabaseAnonKey,
+            'Content-Type': 'image/jpeg',
+            'x-upsert': 'false',
+          },
+        }
+      );
+
+      if (uploadResult.status !== 200) {
+        throw new Error(`Profile photo upload failed: ${uploadResult.body}`);
       }
 
       const { error: updateError } = await supabase

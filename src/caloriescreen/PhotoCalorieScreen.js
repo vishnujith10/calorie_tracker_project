@@ -263,19 +263,24 @@ Guidelines:
       let photoUrl = null;
       try {
         const fileName = `food_photos/${user_id}_${Date.now()}.jpg`;
+        console.log('Upload - step 1: fileName:', fileName);
+        console.log('Upload - step 2: photoUri:', photoUri);
 
         // Get auth token for the upload request
-        const { data: { session } } = await supabase.auth.getSession();
-        const authToken = session?.access_token;
+        const { data: { session: uploadSession } } = await supabase.auth.getSession();
+        const authToken = uploadSession?.access_token;
+        console.log('Upload - step 3: authToken exists:', !!authToken);
 
         if (!authToken) throw new Error('No auth token available');
 
         const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`;
+        console.log('Upload - step 4: uploadUrl:', uploadUrl);
 
         // Use FileSystem.uploadAsync — the only reliable way to upload binary files in Expo/Hermes
         const uploadResult = await FileSystem.uploadAsync(
-          `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`,
+          uploadUrl,
           photoUri,
           {
             httpMethod: 'POST',
@@ -289,13 +294,15 @@ Guidelines:
           }
         );
 
-        if (uploadResult.status !== 200) {
+        console.log('Upload - step 5: status:', uploadResult.status, 'body:', uploadResult.body);
+
+        if (uploadResult.status >= 200 && uploadResult.status < 300) {
+          // Store the storage path for later retrieval with signed URL
+          photoUrl = fileName;
+          console.log('Photo uploaded successfully:', fileName);
+        } else {
           throw new Error(`Upload failed with status ${uploadResult.status}: ${uploadResult.body}`);
         }
-
-        // Store the storage path for later retrieval with signed URL
-        photoUrl = fileName;
-        console.log('Photo uploaded successfully:', fileName);
       } catch (uploadError) {
         console.error('Photo upload error:', uploadError);
         // Continue without photo URL
@@ -346,12 +353,47 @@ Guidelines:
     if (!analysisToUse) return;
     try {
       const { dish_name, total_nutrition, ingredients } = analysisToUse;
-      const { data: { session } } = await supabase.auth.getSession();
-      const user_id = session?.user?.id;
+      const { data: { session: saveSession } } = await supabase.auth.getSession();
+      const user_id = saveSession?.user?.id;
+      const authToken = saveSession?.access_token;
 
       if (!user_id) {
         Alert.alert('You must be logged in to save meals.');
         return;
+      }
+
+      // Upload photo to Supabase Storage
+      let photoUrl = null;
+      if (photoUri && authToken) {
+        try {
+          const fileName = `food_photos/${user_id}_${Date.now()}.jpg`;
+          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+          const uploadUrl = `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`;
+          console.log('SaveMeal - uploading photo to:', uploadUrl);
+
+          const uploadResult = await FileSystem.uploadAsync(uploadUrl, photoUri, {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              apikey: supabaseAnonKey,
+              'Content-Type': 'image/jpeg',
+              'x-upsert': 'false',
+            },
+          });
+
+          console.log('SaveMeal - upload status:', uploadResult.status, 'body:', uploadResult.body);
+
+          if (uploadResult.status >= 200 && uploadResult.status < 300) {
+            photoUrl = fileName;
+            console.log('SaveMeal - photo uploaded successfully:', fileName);
+          } else {
+            console.error('SaveMeal - upload failed:', uploadResult.status, uploadResult.body);
+          }
+        } catch (uploadError) {
+          console.error('SaveMeal - photo upload error:', uploadError);
+        }
       }
 
       const ingredientSummary = ingredients
@@ -368,6 +410,7 @@ Guidelines:
           carbs: Math.round(macros.carbs || 0),
           fat: Math.round(macros.fat || 0),
           fiber: Math.round(macros.fiber || 0),
+          photo_url: photoUrl,
         });
 
       if (error) throw error;

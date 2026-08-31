@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import Constants from "expo-constants";
+import * as FileSystem from "expo-file-system/legacy";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -863,20 +864,33 @@ The JSON object must have this structure:
       if (route?.params?.photoUri) {
         try {
           const fileName = `food-photos/${user.id}/${Date.now()}.jpg`;
+          const { data: { session } } = await supabase.auth.getSession();
+          const authToken = session?.access_token;
+          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
 
-          const response = await fetch(route.params.photoUri);
-          const arrayBuffer = await response.arrayBuffer();
+          if (authToken) {
+            const uploadResult = await FileSystem.uploadAsync(
+              `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`,
+              route.params.photoUri,
+              {
+                httpMethod: 'POST',
+                uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+                headers: {
+                  'Authorization': `Bearer ${authToken}`,
+                  'apikey': supabaseAnonKey,
+                  'Content-Type': 'image/jpeg',
+                  'x-upsert': 'false',
+                },
+              }
+            );
 
-          const { error } = await supabase.storage
-            .from("food-photos")
-            .upload(fileName, arrayBuffer, {
-              contentType: "image/jpeg",
-            });
-
-          if (error) {
-            console.error("Error uploading photo:", error);
-          } else {
-            photoUrl = fileName;
+            if (uploadResult.status >= 200 && uploadResult.status < 300) {
+              photoUrl = fileName;
+              console.log('PostCalorieScreen photo uploaded successfully:', fileName);
+            } else {
+              console.error('PostCalorieScreen upload failed status:', uploadResult.status, uploadResult.body);
+            }
           }
         } catch (uploadError) {
           console.error("Error uploading photo:", uploadError);
@@ -943,20 +957,33 @@ The JSON object must have this structure:
       if (route?.params?.photoUri) {
         try {
           const fileName = `food-photos/${user.id}/${Date.now()}.jpg`;
+          const { data: { session } } = await supabase.auth.getSession();
+          const authToken = session?.access_token;
+          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
 
-          const response = await fetch(route.params.photoUri);
-          const arrayBuffer = await response.arrayBuffer();
+          if (authToken) {
+            const uploadResult = await FileSystem.uploadAsync(
+              `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`,
+              route.params.photoUri,
+              {
+                httpMethod: 'POST',
+                uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+                headers: {
+                  'Authorization': `Bearer ${authToken}`,
+                  'apikey': supabaseAnonKey,
+                  'Content-Type': 'image/jpeg',
+                  'x-upsert': 'false',
+                },
+              }
+            );
 
-          const { error } = await supabase.storage
-            .from("food-photos")
-            .upload(fileName, arrayBuffer, {
-              contentType: "image/jpeg",
-            });
-
-          if (error) {
-            console.error("Error uploading photo:", error);
-          } else {
-            photoUrl = fileName;
+            if (uploadResult.status >= 200 && uploadResult.status < 300) {
+              photoUrl = fileName;
+              console.log('PostCalorieScreen photo uploaded successfully:', fileName);
+            } else {
+              console.error('PostCalorieScreen upload failed status:', uploadResult.status, uploadResult.body);
+            }
           }
         } catch (uploadError) {
           console.error("Error uploading photo:", uploadError);
