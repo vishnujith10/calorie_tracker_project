@@ -231,7 +231,7 @@ const VoiceCalorieScreen = ({ navigation, route }) => {
   // Transcribe audio and show transcription
   const transcribeAudio = async (uri) => {
     try {
-      const models = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-1.5-flash"];
+      const models = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
       const audioData = await FileSystem.readAsStringAsync(uri, {
         encoding: "base64",
       });
@@ -280,7 +280,7 @@ const VoiceCalorieScreen = ({ navigation, route }) => {
     setIsConverting(true); // Show full-screen loading modal
     try {
       // Try fastest → robust models sequentially
-      const models = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-1.5-flash"];
+      const models = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
       const audioData = await FileSystem.readAsStringAsync(uri, {
         encoding: "base64",
       });

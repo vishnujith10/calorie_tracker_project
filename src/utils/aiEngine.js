@@ -30,7 +30,7 @@ const extractJSON = (text) => {
 
 /**
  * Fast detection of food item names from an image.
- * Uses gemini-3.6-flash for speed.
+ * Uses gemini-2.0-flash for speed.
  * @param {string} photoUri Local URI of the photo
  * @returns {Promise<Array>} Array of item objects
  */
@@ -75,7 +75,7 @@ Return ONLY valid JSON like this: {"items": ["Item 1", "Item 2"]}`;
 export const calculateDetailedNutrition = async (photoUri, refinedItems) => {
   if (!genAI) throw new Error('AI API key is not configured.');
 
-  const visionModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-1.5-flash'];
+  const visionModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
   const imageData = await FileSystem.readAsStringAsync(photoUri, { encoding: 'base64' });
 
   const prompt = `Analyze this food image and the following refined items provided by the user:

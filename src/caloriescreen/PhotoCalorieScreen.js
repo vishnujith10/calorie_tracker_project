@@ -70,7 +70,7 @@ const PhotoCalorieScreen = ({ route, navigation }) => {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const visionModels = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-1.5-flash"];
+  const visionModels = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
 
   useEffect(() => {
     if (photoUri) {
@@ -264,21 +264,38 @@ Guidelines:
       try {
         const fileName = `food_photos/${user_id}_${Date.now()}.jpg`;
 
-        // Read the file using fetch
-        const response = await fetch(photoUri);
-        const arrayBuffer = await response.arrayBuffer();
+        // Get auth token for the upload request
+        const { data: { session } } = await supabase.auth.getSession();
+        const authToken = session?.access_token;
 
-        const { error: uploadError } = await supabase.storage
-          .from('food-photos')
-          .upload(fileName, arrayBuffer, {
-            contentType: 'image/jpeg',
-            upsert: false
-          });
+        if (!authToken) throw new Error('No auth token available');
 
-        if (uploadError) throw uploadError;
+        const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+
+        // Use FileSystem.uploadAsync — the only reliable way to upload binary files in Expo/Hermes
+        const uploadResult = await FileSystem.uploadAsync(
+          `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`,
+          photoUri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'apikey': supabaseAnonKey,
+              'Content-Type': 'image/jpeg',
+              'x-upsert': 'false',
+            },
+          }
+        );
+
+        if (uploadResult.status !== 200) {
+          throw new Error(`Upload failed with status ${uploadResult.status}: ${uploadResult.body}`);
+        }
 
         // Store the storage path for later retrieval with signed URL
         photoUrl = fileName;
+        console.log('Photo uploaded successfully:', fileName);
       } catch (uploadError) {
         console.error('Photo upload error:', uploadError);
         // Continue without photo URL
@@ -300,6 +317,13 @@ Guidelines:
 
       await createFoodLog(logData);
 
+      // Optimistic cache update with local URI for immediate rendering
+      const { updateMainDashboardCacheOptimistic, updateHomeScreenCacheOptimistic, updateMainDashboardStreakOptimistic } = require('../utils/cacheManager');
+      const cacheData = { ...logData, photo_url: photoUrl ? photoUri : null };
+      updateMainDashboardCacheOptimistic(cacheData);
+      updateHomeScreenCacheOptimistic(cacheData);
+      updateMainDashboardStreakOptimistic(); // Trigger streak update
+
       // Show generic success message
       Alert.alert(
         "Food Logged! 🍽️",
@@ -310,12 +334,6 @@ Guidelines:
           onPress: () => navigation.replace('Home')
         }]
       );
-
-      // Optimistic cache update
-      const { updateMainDashboardCacheOptimistic, updateHomeScreenCacheOptimistic, updateMainDashboardStreakOptimistic } = require('../utils/cacheManager');
-      updateMainDashboardCacheOptimistic(logData);
-      updateHomeScreenCacheOptimistic(logData);
-      updateMainDashboardStreakOptimistic(); // Trigger streak update
 
     } catch (error) {
       console.error('Error logging food:', error);
@@ -394,7 +412,7 @@ Guidelines:
 
     setIsReanalyzing(true);
     try {
-      const models = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-1.5-flash'];
+      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
       let lastError = null;
 
       for (const modelName of models) {

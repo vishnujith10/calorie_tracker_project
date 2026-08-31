@@ -539,7 +539,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const session = model.startChat({ history: geminiHistory });
     setChatSession(session);
   };
