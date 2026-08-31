@@ -3,27 +3,27 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
 import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import {
-  Alert,
-  BackHandler,
-  Dimensions,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    BackHandler,
+    Dimensions,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { OnboardingContext } from "../context/OnboardingContext";
@@ -31,15 +31,15 @@ import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 import { createFoodLog, deleteFoodLog, getFoodLogs } from "../utils/api";
 import {
-  getHomeScreenCache,
-  invalidateHomeScreenCache,
-  updateHomeScreenCacheOptimistic,
+    getHomeScreenCache,
+    invalidateHomeScreenCache,
+    updateHomeScreenCacheOptimistic,
 } from "../utils/cacheManager";
 import { getTodayCaloriesBurned } from "../utils/calorieCalculator";
 import {
-  getFoodStreak,
-  recalculateFoodStreak,
-  updateFoodStreak,
+    getFoodStreak,
+    recalculateFoodStreak,
+    updateFoodStreak,
 } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
 
@@ -69,8 +69,8 @@ export const userNameCache = {
 };
 
 export {
-  invalidateHomeScreenCache,
-  updateHomeScreenCacheOptimistic as updateHomeScreenCache
+    invalidateHomeScreenCache,
+    updateHomeScreenCacheOptimistic as updateHomeScreenCache
 };
 
 const HomeHeader = React.memo(
@@ -743,7 +743,7 @@ const HomeScreen = ({ navigation }) => {
       const recent = filteredLogs.slice(-5).reverse();
       const withUrls = await Promise.all(
         recent.map(async (meal) => {
-          if (meal.photo_url && !meal.photo_url.startsWith("http")) {
+          if (meal.photo_url && !meal.photo_url.startsWith("http") && !meal.photo_url.startsWith("file://")) {
             try {
               const { data } = await supabase.storage
                 .from("food-photos")
@@ -1284,7 +1284,7 @@ const HomeScreen = ({ navigation }) => {
                   activeOpacity={0.88}
                 >
                   <View style={styles.mealLogTopRow}>
-                    {meal.photo_url && meal.photo_url.startsWith("http") ? (
+                    {meal.photo_url && (meal.photo_url.startsWith("http") || meal.photo_url.startsWith("file://")) ? (
                       <Image
                         source={{ uri: meal.photo_url }}
                         style={styles.mealLogImage}
