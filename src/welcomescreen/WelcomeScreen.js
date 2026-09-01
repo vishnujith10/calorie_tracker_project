@@ -15,9 +15,11 @@ const WelcomeScreen = () => {
       backgroundColor: colors.background,
     },
     logoWrap: {
-      backgroundColor: isDark ? '#1A1A2E' : '#faf9f6',
+      width: 200,
+      height: 200,
+      backgroundColor: isDark ? '#1A1A2E' : '#EAF8F6',
       borderRadius: 40,
-      padding: 32,
+      overflow: 'hidden',
       marginBottom: 36,
       marginTop: 24,
       shadowColor: colors.shadow,
@@ -89,7 +91,7 @@ const WelcomeScreen = () => {
       >
         <View style={styles.contentWrap}>
           <View style={dynamicStyles.logoWrap}>
-            <Image source={require('../../assets/logo/logo.png')} style={styles.logoImage} />
+            <Image source={require('../../assets/logo/calora-logo.png')} style={styles.logoImage} />
           </View>
           <Text style={dynamicStyles.welcomeTitle}>Welcome to Calora</Text>
           <Text style={dynamicStyles.subtitle}>
@@ -115,7 +117,7 @@ const WelcomeScreen = () => {
 const styles = StyleSheet.create({
   flexGrow: {
     flex: 1,
-    justifyContent: 'space-between',
+    justify: 'space-between',
   },
   contentWrap: {
     flex: 1,
@@ -125,9 +127,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   logoImage: {
-    width: 170,
-    height: 170,
-    resizeMode: 'contain',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   bottomArea: {
     width: '100%',
@@ -142,4 +144,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WelcomeScreen; 
+export default WelcomeScreen;
