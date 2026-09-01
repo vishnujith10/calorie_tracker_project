@@ -235,15 +235,15 @@ const MiniProfileScreen = () => {
 
     try {
       await AsyncStorage.setItem(
-        "kalry_onboarding_weight",
+        "calora_onboarding_weight",
         isMetric ? weightKg : weightLbs,
       );
       await AsyncStorage.setItem(
-        "kalry_onboarding_height",
+        "calora_onboarding_height",
         isMetric ? heightCm : heightFt,
       );
       await AsyncStorage.setItem(
-        "kalry_onboarding_unit",
+        "calora_onboarding_unit",
         isMetric ? "kg" : "lbs",
       );
     } catch (e) {

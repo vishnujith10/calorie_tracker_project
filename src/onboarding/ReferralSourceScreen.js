@@ -344,7 +344,7 @@ const ReferralSourceScreen = ({ navigation }) => {
                 <TextInput
                   ref={inputRef}
                   style={dynamicStyles.otherInput}
-                  placeholder="Tell us where you found Kalry..."
+                  placeholder="Tell us where you found Calora..."
                   value={otherText}
                   onChangeText={setOtherText}
                   onFocus={handleOtherInputFocus}

@@ -91,7 +91,7 @@ const WelcomeScreen = () => {
           <View style={dynamicStyles.logoWrap}>
             <Image source={require('../../assets/logo/logo.png')} style={styles.logoImage} />
           </View>
-          <Text style={dynamicStyles.welcomeTitle}>Welcome to Kalry</Text>
+          <Text style={dynamicStyles.welcomeTitle}>Welcome to Calora</Text>
           <Text style={dynamicStyles.subtitle}>
             Your space to grow strong habits, gently — and with meaning.
           </Text>

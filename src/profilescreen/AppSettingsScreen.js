@@ -1645,7 +1645,7 @@ const AppSettingsScreen = () => {
           )}
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Kalry App v2.1.0</Text>
+            <Text style={styles.footerText}>Calora App v2.1.0</Text>
           </View>
         </View>
       </ScrollView>

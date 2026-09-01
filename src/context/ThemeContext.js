@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import supabase from '../lib/supabase';
 
-const THEME_STORAGE_KEY = 'kalry_app_theme';
+const THEME_STORAGE_KEY = 'calora_app_theme';
 
 export const ThemeContext = createContext();
 

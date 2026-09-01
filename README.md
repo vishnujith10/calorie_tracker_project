@@ -1,6 +1,6 @@
-# Calk (formerly Kalry) 📱🥗
+# Calora 📱🥗
 
-Calk is a smart React Native / Expo fitness and nutrition tracker powered by Google Gemini AI and Supabase. The app tracks daily calorie intake, macronutrients (protein, carbs, fat, fiber), hydration, weight, sleep, and activity with advanced AI-driven tools.
+Calora is a smart React Native / Expo fitness and nutrition tracker powered by Google Gemini AI and Supabase. The app tracks daily calorie intake, macronutrients (protein, carbs, fat, fiber), hydration, weight, sleep, and activity with advanced AI-driven tools.
 
 ---
 

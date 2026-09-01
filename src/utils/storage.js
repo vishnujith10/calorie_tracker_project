@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const FOOD_LOGS_KEY = 'kalry_food_logs';
-const USER_PROFILE_KEY = 'kalry_user_profile';
+const FOOD_LOGS_KEY = 'calora_food_logs';
+const USER_PROFILE_KEY = 'calora_user_profile';
 
 // User Profile Storage
 export const saveUserProfile = async (profile) => {

@@ -56,9 +56,9 @@ const WeightGoalScreen = ({ navigation }) => {
     const getLocalOnboarding = async () => {
       if (!onboardingData.weight || !onboardingData.height) {
         try {
-          const w = await AsyncStorage.getItem("kalry_onboarding_weight");
-          const h = await AsyncStorage.getItem("kalry_onboarding_height");
-          const u = await AsyncStorage.getItem("kalry_onboarding_unit");
+          const w = await AsyncStorage.getItem("calora_onboarding_weight");
+          const h = await AsyncStorage.getItem("calora_onboarding_height");
+          const u = await AsyncStorage.getItem("calora_onboarding_unit");
           if (w && h && u) {
             setOnboardingData((prev) => ({
               ...prev,

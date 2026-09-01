@@ -732,7 +732,7 @@ The JSON object must have this structure:
           {!isRecording && !nutritionData && (
             <>
               <Text style={styles.instructions}>
-                Speak naturally – Kalry listens & structures it
+                Speak naturally – Calora listens & structures it
               </Text>
               <Text style={styles.sampleText}>
                 Try: &quot;I had a chicken sandwich and a juice&quot;
@@ -743,7 +743,7 @@ The JSON object must have this structure:
             <>
               <Text style={styles.listeningText}>Listening...</Text>
               <Text style={styles.instructions}>
-                Speak naturally – Kalry listens & structures it
+                Speak naturally – Calora listens & structures it
               </Text>
               <Text style={styles.sampleText}>
                 Try: &quot;I had a chicken sandwich and a juice&quot;

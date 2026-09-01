@@ -1,13 +1,13 @@
 import "dotenv/config";
 export default {
   expo: {
-    name: "kalry",
-    slug: "kalry",
-    owner: "amanmahfuz",
+    name: "Calora",
+    slug: "calora",
+    owner: "vishnu242552",
     version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
-    scheme: "kalry",
+    scheme: "calora",
     icon: "./assets/logo/logo.png",
     newArchEnabled: true,
     splash: {
@@ -18,20 +18,20 @@ export default {
     assetBundlePatterns: ["/*"],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.kalry.app",
+      bundleIdentifier: "com.calora.app",
       infoPlist: {
         NSPhotoLibraryUsageDescription:
-          "Allow Kalry to access your photos to analyze food images.",
+          "Allow Calora to access your photos to analyze food images.",
         NSCameraUsageDescription:
-          "Allow Kalry to access your camera to take food photos.",
+          "Allow Calora to access your camera to take food photos.",
         NSMicrophoneUsageDescription:
-          "Allow Kalry to access your microphone for voice food descriptions.",
+          "Allow Calora to access your microphone for voice food descriptions.",
         NSSpeechRecognitionUsageDescription:
           "We transcribe your speech to text.",
       },
     },
     android: {
-      package: "com.kalry.app",
+      package: "com.calora.app",
       adaptiveIcon: {
         foregroundImage: "./assets/logo/logo.png",
         backgroundColor: "#ffffff",
@@ -78,7 +78,7 @@ export default {
         "expo-audio",
         {
           microphonePermission:
-            "Allow Kalry to access your microphone for voice food descriptions.",
+            "Allow Calora to access your microphone for voice food descriptions.",
         },
       ],
       [

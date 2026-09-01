@@ -109,7 +109,7 @@ const SignupScreen = ({ navigation }) => {
         email: cleanEmail,
         password,
         options: {
-          emailRedirectTo: 'kalry://login',
+          emailRedirectTo: 'calora://login',
         },
       });
 

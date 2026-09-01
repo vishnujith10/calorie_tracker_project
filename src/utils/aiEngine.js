@@ -155,7 +155,7 @@ export const generateDailySummary = async (metrics) => {
   
   const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
   
-  const prompt = `You are a supportive, expert nutrition coach for the app Kalry. 
+  const prompt = `You are a supportive, expert nutrition coach for the app Calora. 
 Write a short, engaging daily summary (3-4 sentences max) for the user based on today's metrics:
 - Calories: ${metrics.calories} kcal (Goal: ${metrics.calorieGoal})
 - Protein: ${metrics.protein}g (Goal: ${metrics.proteinGoal}g)
@@ -185,14 +185,14 @@ Return ONLY the text of the summary, no markdown, no JSON, just the friendly mes
  * @param {Object} context User's current day health context
  * @returns {Promise<string>} The AI's response
  */
-export const askKalryContextual = async (messages, context) => {
+export const askCaloraContextual = async (messages, context) => {
   if (!genAI) throw new Error('AI API key is not configured.');
   
   const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
   // 1. Build the system context block
-  const systemPrompt = `You are Kalry, an expert, supportive, and highly personalized nutrition and fitness coach. 
-You are currently chatting with the user in the Kalry app.
+  const systemPrompt = `You are Calora, an expert, supportive, and highly personalized nutrition and fitness coach. 
+You are currently chatting with the user in the Calora app.
 
 IMPORTANT: You are CONTEXT-AWARE. You have access to the user's live data for today. 
 Do not ask them what they ate if it is listed below. Use this data to provide highly personalized, accurate advice.
@@ -223,7 +223,7 @@ Guidelines for your response:
     const chat = model.startChat({
       history: [
         { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Understood. I have reviewed the user context and will act as Kalry, their personal expert nutrition coach.' }] },
+        { role: 'model', parts: [{ text: 'Understood. I have reviewed the user context and will act as Calora, their personal expert nutrition coach.' }] },
         ...formattedHistory.slice(0, -1) // Exclude the very last message which we will send now
       ]
     });
@@ -237,7 +237,7 @@ Guidelines for your response:
     
     return result.response.text();
   } catch (error) {
-    console.log('Ask Kalry error:', error);
+    console.log('Ask Calora error:', error);
     throw new Error('Sorry, I am having trouble connecting right now. Please try again later.');
   }
 };
