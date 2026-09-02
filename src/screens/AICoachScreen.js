@@ -594,9 +594,56 @@ Use this memory to provide continuity and more personalized advice. Do not expli
     setIsLoading(true);
 
     try {
-      if (!chatSession) throw new Error('AI is not configured (Missing API Key)');
-      const result = await chatSession.sendMessage(userText);
-      const aiText = result.response.text();
+      if (!chatSession && !genAI) throw new Error('AI is not configured (Missing API Key)');
+
+      let aiText = '';
+      try {
+        if (!chatSession) {
+          const allSessions = await loadSessions();
+          const otherSessions = allSessions.filter((s) => s.id !== sessionIdRef.current);
+          const systemPrompt = buildSystemPrompt(userContext, otherSessions);
+          const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+          const newChat = model.startChat({
+            history: [
+              { role: 'user', parts: [{ text: systemPrompt }] },
+              { role: 'model', parts: [{ text: 'Understood. I am ready to help as your personalized Calora AI Coach.' }] },
+            ],
+          });
+          setChatSession(newChat);
+          const result = await newChat.sendMessage(userText);
+          aiText = result.response.text();
+        } else {
+          const result = await chatSession.sendMessage(userText);
+          aiText = result.response.text();
+        }
+      } catch (primaryError) {
+        console.warn('AICoachScreen - Primary model busy/failed (503/error), trying gemini-3.5-flash-lite fallback:', primaryError?.message);
+        
+        // Build full message history for fallback model
+        const allSessions = await loadSessions();
+        const otherSessions = allSessions.filter((s) => s.id !== sessionIdRef.current);
+        const systemPrompt = buildSystemPrompt(userContext, otherSessions);
+
+        const fallbackHistory = [
+          { role: 'user', parts: [{ text: systemPrompt }] },
+          { role: 'model', parts: [{ text: 'Understood. I am ready to help as your personalized Calora AI Coach.' }] },
+        ];
+
+        // Add all previous messages (excluding the new user message we will send)
+        for (const msg of messagesRef.current.slice(0, -1)) {
+          if (msg.id === 'welcome') continue;
+          fallbackHistory.push({
+            role: msg.isUser ? 'user' : 'model',
+            parts: [{ text: msg.text }],
+          });
+        }
+
+        const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+        const fallbackSession = fallbackModel.startChat({ history: fallbackHistory });
+        const fallbackResult = await fallbackSession.sendMessage(userText);
+        aiText = fallbackResult.response.text();
+        setChatSession(fallbackSession);
+      }
 
       const aiMsg = {
         id: (Date.now() + 1).toString(),

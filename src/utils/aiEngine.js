@@ -153,8 +153,7 @@ Guidelines:
 export const generateDailySummary = async (metrics) => {
   if (!genAI) throw new Error('AI API key is not configured.');
   
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-  
+  const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
   const prompt = `You are a supportive, expert nutrition coach for the app Calora. 
 Write a short, engaging daily summary (3-4 sentences max) for the user based on today's metrics:
 - Calories: ${metrics.calories} kcal (Goal: ${metrics.calorieGoal})
@@ -166,17 +165,21 @@ Write a short, engaging daily summary (3-4 sentences max) for the user based on 
 Provide actionable advice for tomorrow if they missed a goal, or praise if they hit them. 
 Return ONLY the text of the summary, no markdown, no JSON, just the friendly message.`;
 
-  try {
-    const result = await raceWithTimeout(
-      model.generateContent(prompt),
-      15000,
-      'Summary generation timed out.'
-    );
-    return await result.response.text();
-  } catch (error) {
-    console.log('Daily summary error:', error);
-    return "You're doing great! Keep logging your meals to get personalized daily summaries.";
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await raceWithTimeout(
+        model.generateContent(prompt),
+        15000,
+        'Summary generation timed out.'
+      );
+      return await result.response.text();
+    } catch (error) {
+      console.warn(`aiEngine - generateDailySummary model ${modelName} failed, trying fallback:`, error?.message);
+    }
   }
+
+  return "You're doing great! Keep logging your meals to get personalized daily summaries.";
 };
 
 /**
@@ -187,8 +190,6 @@ Return ONLY the text of the summary, no markdown, no JSON, just the friendly mes
  */
 export const askCaloraContextual = async (messages, context) => {
   if (!genAI) throw new Error('AI API key is not configured.');
-  
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
   // 1. Build the system context block
   const systemPrompt = `You are Calora, an expert, supportive, and highly personalized nutrition and fitness coach. 
@@ -213,31 +214,39 @@ Guidelines for your response:
 4. Do NOT use markdown headers or bold text excessively. Keep it feeling like a human text message.`;
 
   // 2. Format history for Gemini API
-  // Gemini expects history in format: { role: 'user' | 'model', parts: [{ text: '...' }] }
   const formattedHistory = messages.map(msg => ({
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.content }]
   }));
 
-  try {
-    const chat = model.startChat({
-      history: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Understood. I have reviewed the user context and will act as Calora, their personal expert nutrition coach.' }] },
-        ...formattedHistory.slice(0, -1) // Exclude the very last message which we will send now
-      ]
-    });
+  const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+  let lastError = null;
 
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await raceWithTimeout(
-      chat.sendMessage(lastMessage),
-      20000,
-      'Response timed out. Please try again.'
-    );
-    
-    return result.response.text();
-  } catch (error) {
-    console.log('Ask Calora error:', error);
-    throw new Error('Sorry, I am having trouble connecting right now. Please try again later.');
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const chat = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: systemPrompt }] },
+          { role: 'model', parts: [{ text: 'Understood. I have reviewed the user context and will act as Calora, their personal expert nutrition coach.' }] },
+          ...formattedHistory.slice(0, -1)
+        ]
+      });
+
+      const lastMessage = messages[messages.length - 1].content;
+      const result = await raceWithTimeout(
+        chat.sendMessage(lastMessage),
+        20000,
+        'Response timed out. Please try again.'
+      );
+      
+      return result.response.text();
+    } catch (error) {
+      console.warn(`aiEngine - askCaloraContextual model ${modelName} failed, trying fallback:`, error?.message);
+      lastError = error;
+    }
   }
+
+  console.error('Ask Calora error:', lastError);
+  throw new Error('Sorry, I am having trouble connecting right now. Please try again later.');
 };
