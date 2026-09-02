@@ -8,10 +8,10 @@ export default {
     orientation: "portrait",
     userInterfaceStyle: "light",
     scheme: "calora",
-    icon: "./assets/logo/logo.png",
+    icon: "./assets/logo/calora-logo.png",
     newArchEnabled: true,
     splash: {
-      image: "./assets/logo/logo.png",
+      image: "./assets/logo/calora-logo.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff",
     },
@@ -33,7 +33,7 @@ export default {
     android: {
       package: "com.calora.app",
       adaptiveIcon: {
-        foregroundImage: "./assets/logo/logo.png",
+        foregroundImage: "./assets/logo/calora-logo.png",
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
@@ -67,7 +67,7 @@ export default {
       [
         "expo-notifications",
         {
-          icon: "./assets/logo/logo.png",
+          icon: "./assets/logo/calora-logo.png",
           color: "#7C3AED",
           sounds: [],
         },

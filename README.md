@@ -10,7 +10,7 @@ Calora is a smart React Native / Expo fitness and nutrition tracker powered by G
 Simply snap or upload a photo of your meal. The app uses the advanced **Gemini 3.6 Flash** vision model to identify distinct food items, estimate portion sizes, compute nutritional information (calories, protein, carbs, fat, fiber), and write a customized insight based on user oil/portion preferences.
 
 ### 🎙️ Voice-to-Calorie Logging
-Describe what you ate out loud. Calk transcribes your audio and estimates the meals, portions, and complete nutritional breakdown in real-time.
+Describe what you ate out loud. Calora transcribes your audio and estimates the meals, portions, and complete nutritional breakdown in real-time.
 
 ### 🤖 Context-Aware AI Coach
 Chat with your personal AI wellness coach (powered by Gemini). The coach has full awareness of your current day's live context (your calorie goals, logged meals, hydration intake, and weight trend) to give highly personalized, action-oriented, and encouraging guidance.
@@ -61,7 +61,7 @@ EXPO_PUBLIC_GEMINI_COACH_KEY=your-gemini-coach-key
 # OAuth / OAuth Scheme
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_WEB_CLIENT_ID=your-google-web-client-id
-EXPO_PUBLIC_SCHEME=calk://
+EXPO_PUBLIC_SCHEME=calora://
 ```
 
 ### 4. Running the Development Server

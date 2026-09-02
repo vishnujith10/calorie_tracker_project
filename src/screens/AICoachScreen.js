@@ -28,13 +28,13 @@ const apiKey = process.env.EXPO_PUBLIC_GEMINI_COACH_KEY || process.env.EXPO_PUBL
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const SESSIONS_KEY = '@calk_ai_coach_sessions';
+const SESSIONS_KEY = '@calora_ai_coach_sessions';
 const MAX_SESSIONS = 20;
 const MAX_MEMORY_SESSIONS = 5;
 
 const WELCOME_MESSAGE = {
   id: 'welcome',
-  text: "Hi! I'm your Calk AI Coach 👋. I can help estimate calories, suggest meals, or give personalized wellness advice. What's on your mind today?",
+  text: "Hi! I'm your Calora AI Coach 👋. I can help estimate calories, suggest meals, or give personalized wellness advice. What's on your mind today?",
   isUser: false,
   timestamp: new Date().toISOString(),
 };
@@ -420,7 +420,7 @@ export default function AICoachScreen({ navigation }) {
 
   // ─── System Prompt Builder ────────────────────────────────────────────────
   const buildSystemPrompt = (ctx, pastSessions) => {
-    let prompt = `You are Calk AI, an expert nutritionist, wellness coach, and health assistant built into the Calk app.
+    let prompt = `You are Calora AI, an expert nutritionist, wellness coach, and health assistant built into the Calora app.
 Your goals:
 1. Estimate calories and macros when users describe foods or meals.
 2. Give personalized, practical diet and workout recommendations using the user's live data below.
@@ -494,7 +494,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
             role: 'model',
             parts: [
               {
-                text: 'Understood. I am ready to help as your personalized Calk AI Coach.',
+                text: 'Understood. I am ready to help as your personalized Calora AI Coach.',
               },
             ],
           },
@@ -527,7 +527,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       { role: 'user', parts: [{ text: systemPrompt }] },
       {
         role: 'model',
-        parts: [{ text: 'Understood. I am ready to help as your personalized Calk AI Coach.' }],
+        parts: [{ text: 'Understood. I am ready to help as your personalized Calora AI Coach.' }],
       },
     ];
 
@@ -735,7 +735,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
 
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: isDark ? '#F4FBFA' : '#173A37' }]}>
-            Calk AI Coach
+            Calora AI Coach
           </Text>
           <Text style={[styles.headerSubtitle, { color: isDark ? '#8FAAA5' : '#5E7D78' }]}>
             {isLoadingContext ? 'Loading your data...' : 'Always here to help'}

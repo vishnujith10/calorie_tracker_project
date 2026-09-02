@@ -1543,7 +1543,7 @@ const MainDashboardScreen = ({ route }) => {
                 <Text style={[styles.insightBadgeText, { color: isDark ? '#A78BFA' : '#7B61FF' }]}>Smart</Text>
               </View>
               <Text style={[styles.insightMetricValue, { fontSize: 22 }]}>
-                Ask Calk
+                Ask Calora
               </Text>
               <Text style={styles.insightMetricSub}>
                 Food logging & advice
