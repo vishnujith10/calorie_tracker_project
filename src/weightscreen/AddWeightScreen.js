@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -77,7 +78,7 @@ const AddWeightScreen = ({ navigation }) => {
 
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -109,24 +110,35 @@ const AddWeightScreen = ({ navigation }) => {
     setUploading(true);
     let photo_url = null;
     if (newPhoto) {
-      const fileExt = newPhoto.uri.split(".").pop();
-      const fileName = `${userId}_${Date.now()}.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from("weight-photos")
-        .upload(fileName, {
-          uri: newPhoto.uri,
-          type: "image/jpeg",
-          name: fileName,
-        });
-      if (error) {
+      const fileName = `${userId}/${Date.now()}.jpg`;
+      const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+      if (!authToken) {
         setUploading(false);
-        Alert.alert("Photo upload failed", error.message);
+        Alert.alert("Photo upload failed", "Not authenticated. Please log in again.");
         return;
       }
-      photo_url = data?.path
-        ? supabase.storage.from("weight-photos").getPublicUrl(data.path)
-            .publicUrl
-        : null;
+      const uploadResult = await FileSystem.uploadAsync(
+        `${supabaseUrl}/storage/v1/object/weight-photos/${fileName}`,
+        newPhoto.uri,
+        {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY',
+            'Content-Type': 'image/jpeg',
+            'x-upsert': 'false',
+          },
+        }
+      );
+      if (uploadResult.status !== 200) {
+        setUploading(false);
+        Alert.alert("Photo upload failed", `Upload error: ${uploadResult.body}`);
+        return;
+      }
+      photo_url = fileName; // Store path; WeightTrackerScreen generates signed URLs on display
     }
     const today = new Date().toISOString().slice(0, 10);
     let weightValue = parseFloat(cleanedWeight);
@@ -176,13 +188,24 @@ const AddWeightScreen = ({ navigation }) => {
       }
 
       // Update WeightTrackerScreen cache
+      let displayPhotoUrl = null;
+      if (photo_url) {
+        // Generate a signed URL for immediate display in the tracker
+        try {
+          const { data: signedData } = await supabase.storage
+            .from('weight-photos')
+            .createSignedUrl(photo_url, 60 * 60 * 24 * 7);
+          displayPhotoUrl = signedData?.signedUrl || null;
+        } catch (_) {}
+      }
+
       const newLog = {
         user_id: userId,
         date: today,
         weight: weightValue,
         note: newNote,
         emoji: newEmoji,
-        photo_url,
+        photo_url: displayPhotoUrl, // use signed URL in cache, not raw path
       };
 
       // Access the global cache from WeightTrackerScreen
@@ -197,7 +220,8 @@ const AddWeightScreen = ({ navigation }) => {
             weight: weightValue,
           },
         };
-        globalWeightCache.lastFetchTime = Date.now();
+        // Invalidate timestamp so WeightTrackerScreen re-fetches fresh data on focus
+        globalWeightCache.lastFetchTime = 0;
       }
     } catch (error) {
       // Silent - cache might not exist yet

@@ -5,6 +5,7 @@ import {
     Alert,
     Dimensions,
     FlatList,
+    Image,
     Alert as RNAlert,
     StyleSheet,
     Text,
@@ -157,7 +158,24 @@ const WeightTrackerScreen = ({ navigation }) => {
           }
 
           if (!logsError && logsData) {
-            setLogs(logsData);
+            // Generate signed URLs for logs that have a photo stored as a path (not a full URL)
+            const logsWithPhotos = await Promise.all(
+              logsData.map(async (log) => {
+                if (log.photo_url && !log.photo_url.startsWith('http')) {
+                  const { data: signedData } = await supabase.storage
+                    .from('weight-photos')
+                    .createSignedUrl(log.photo_url, 60 * 60 * 24 * 7); // 7-day signed URL
+                  return { ...log, photo_url: signedData?.signedUrl || null };
+                }
+                return log;
+              })
+            );
+            setLogs(logsWithPhotos);
+            // Update cache with resolved URLs
+            globalWeightCache.cachedData = {
+              ...globalWeightCache.cachedData,
+              logs: logsWithPhotos,
+            };
           }
 
           // Update current weight state
@@ -172,8 +190,11 @@ const WeightTrackerScreen = ({ navigation }) => {
 
           if (latestWeight > 0) setCurrentWeight(latestWeight);
 
+          if (!globalWeightCache.cachedData) {
+            globalWeightCache.cachedData = {};
+          }
           globalWeightCache.cachedData = {
-            logs: logsData || [],
+            logs: globalWeightCache.cachedData?.logs || logsData || [],
             userProfile: profile || null,
           };
           globalWeightCache.lastFetchTime = Date.now();
@@ -389,13 +410,29 @@ const WeightTrackerScreen = ({ navigation }) => {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            // Optimistic update — remove from UI immediately
+            setLogs((prev) => {
+              const updated = prev.filter((l) => l.id !== logId);
+              // Sync cache with the updated list
+              if (globalWeightCache.cachedData) {
+                globalWeightCache.cachedData = {
+                  ...globalWeightCache.cachedData,
+                  logs: updated,
+                };
+              }
+              // Invalidate cache timestamp so next focus triggers a real fetch
+              globalWeightCache.lastFetchTime = 0;
+              return updated;
+            });
+
             const { error } = await supabase
               .from("weight_logs")
               .delete()
               .eq("id", logId);
             if (error) {
               Alert.alert("Error", error.message);
-            } else {
+              // Revert: force a fresh fetch
+              globalWeightCache.lastFetchTime = 0;
               setRefreshing((r) => !r);
             }
           },
@@ -584,6 +621,14 @@ const WeightTrackerScreen = ({ navigation }) => {
                 />
               </TouchableOpacity>
             </View>
+
+            {item.photo_url ? (
+              <Image
+                source={{ uri: item.photo_url }}
+                style={styles.logPhoto}
+                resizeMode="cover"
+              />
+            ) : null}
           </View>
         )}
         ListEmptyComponent={
@@ -877,6 +922,12 @@ const createStyles = (palette) =>
       backgroundColor: palette.cardSecondary,
       alignItems: "center",
       justifyContent: "center",
+    },
+    logPhoto: {
+      width: "100%",
+      height: 180,
+      borderRadius: 16,
+      marginTop: 12,
     },
 
     emptyStateCard: {
