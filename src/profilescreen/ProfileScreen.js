@@ -341,7 +341,7 @@ const ProfileScreen = () => {
   const openImagePicker = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -349,6 +349,8 @@ const ProfileScreen = () => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImage = result.assets[0];
+        // Optimistic UI — show local URI immediately while upload runs
+        setProfilePhotoUrl(selectedImage.uri);
         await uploadProfilePhoto(selectedImage.uri);
       }
     } catch (error) {
@@ -503,9 +505,7 @@ const ProfileScreen = () => {
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
-        <View style={styles.headerActionGhost}>
-          <Ionicons name="ellipse" size={16} color="transparent" />
-        </View>
+        <View style={styles.headerActionGhost} />
       </View>
 
       <ScrollView
@@ -606,32 +606,7 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        <View style={styles.quickStatsSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Highlights</Text>
-            <Text style={styles.sectionHint}>This week</Text>
-          </View>
-
-          <View style={styles.featuredStatCard}>
-            <View style={styles.featuredStatLeft}>
-              <Text style={styles.featuredStatEyebrow}>Consistency</Text>
-              <Text style={styles.featuredStatValue}>7 days</Text>
-              <Text style={styles.featuredStatText}>
-                You are maintaining a healthy rhythm across your recent
-                activity.
-              </Text>
-            </View>
-            <View style={styles.featuredStatIconWrap}>
-              <Ionicons
-                name="flame-outline"
-                size={26}
-                color={palette.primary}
-              />
-            </View>
-          </View>
-
-         
-        </View>
+        
 
         <View style={styles.settingsWrap}>
           <View style={styles.sectionHeaderRow}>
