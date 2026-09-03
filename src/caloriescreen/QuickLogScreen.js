@@ -173,7 +173,7 @@ export default function QuickLogScreen({ navigation }) {
       const raceWithTimeout = (
         promise,
         ms,
-        timeoutMessage = "Request timed out",
+        timeoutMessage = "The model is taking more time to respond. Please try again.",
       ) => {
         return Promise.race([
           promise,
@@ -242,11 +242,11 @@ IMPORTANT RULES:
 The JSON object must have this structure: 
 { "transcription": "The meal text you analyzed", "items": [ { "name": "quantity + food item", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } ], "total": { "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } }`;
 
-          // Add timeout (30 seconds) for network requests
+          // Add timeout (15 seconds) for network requests
           const result = await raceWithTimeout(
             model.generateContent(prompt),
-            30000,
-            "Network request timed out. Please check your internet connection and try again.",
+            15000,
+            "The model is taking more time to respond. Please try again.",
           );
           const response = await result.response;
           let text = response.text();
@@ -307,9 +307,11 @@ The JSON object must have this structure:
 
             setAnalysis(analysisData);
             await setCachedAnalysis(mealText, analysisData);
+            
+            // Auto-navigate to PostCalorieScreen with analysis data
             navigation.navigate("PostCalorieScreen", {
               analysis: analysisData,
-              mealName: "",
+              mealName: analysisData.dish_name,
             });
             return; // Success, exit the loop
           } else {
@@ -328,7 +330,7 @@ The JSON object must have this structure:
       }
 
       // If all models failed, show error
-      throw lastError || new Error("All AI models are currently unavailable.");
+      throw lastError || new Error("The model is taking more time to respond. Please try again.");
     } catch (error) {
       console.error("QuickLogScreen - Analysis error:", error);
       let errorMessage = "Could not analyze the meal.";
@@ -337,10 +339,11 @@ The JSON object must have this structure:
       if (
         error.message.includes("timed out") ||
         error.message.includes("timeout") ||
+        error.message.includes("taking more time") ||
         error.message.includes("Network request timed out")
       ) {
         errorMessage =
-          "Network error: Connection is slow or timed out. Please check your internet connection and try again.";
+          "The model is taking more time to respond. Please try again.";
       } else if (
         error.message.includes("fetch") ||
         error.message.includes("network") ||

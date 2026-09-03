@@ -89,7 +89,7 @@ const PhotoCalorieScreen = ({ route, navigation }) => {
     setIsLoading(true);
     try {
       // Timeout wrapper for network requests
-      const raceWithTimeout = (promise, ms, timeoutMessage = 'Request timed out') => {
+      const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
         return Promise.race([
           promise,
           new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
@@ -146,14 +146,14 @@ Guidelines:
 - Provide nutritional values per the entire visible portion
 - Confidence should reflect how clearly you can identify the food`;
 
-          // Add timeout (30 seconds) for network requests
+          // Add timeout (25 seconds) for photo vision analysis
           const result = await raceWithTimeout(
             model.generateContent([
               prompt,
               { inlineData: { mimeType: "image/jpeg", data: imageData } },
             ]),
-            30000,
-            'Network request timed out. Please check your internet connection and try again.'
+            25000,
+            'The model is taking more time to respond. Please try again.'
           );
 
           const response = await result.response;
@@ -197,7 +197,7 @@ Guidelines:
         }
       }
 
-      throw lastError || new Error('All AI models are currently unavailable.');
+      throw lastError || new Error('The model is taking more time to respond. Please try again.');
 
     } catch (error) {
       console.error('PhotoCalorieScreen - Analysis error:', error);
@@ -207,11 +207,12 @@ Guidelines:
       if (
         msg.includes("timed out") ||
         msg.includes("timeout") ||
+        msg.includes("taking more time") ||
         msg.includes("network request timed out")
       ) {
         Alert.alert(
-          "Network Error",
-          "Connection is slow or timed out. Please check your internet connection and try again."
+          "Request Timeout",
+          "The model is taking more time to respond. Please try again."
         );
       } else if (
         msg.includes("fetch") ||
@@ -509,7 +510,18 @@ IMPORTANT RULES:
 The JSON object must have this structure: 
 { "transcription": "The meal text you analyzed", "items": [ { "name": "quantity + food item", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } ], "total": { "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } }`;
 
-          const result = await model.generateContent(prompt);
+          const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+            return Promise.race([
+              promise,
+              new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+            ]);
+          };
+
+          const result = await raceWithTimeout(
+            model.generateContent(prompt),
+            15000,
+            'The model is taking more time to respond. Please try again.'
+          );
           const response = await result.response;
           let text = response.text();
           console.log("PhotoCalorieScreen - Re-analysis raw response:", text);
@@ -569,10 +581,16 @@ The JSON object must have this structure:
         }
       }
 
-      throw lastError || new Error('All AI models are currently unavailable.');
+      throw lastError || new Error('The model is taking more time to respond. Please try again.');
     } catch (error) {
       console.error('PhotoCalorieScreen - Re-analysis error:', error);
-      Alert.alert('Error', error.message || 'Failed to re-analyze food. Please try again.');
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
+      Alert.alert(
+        isTimeout ? 'Request Timeout' : 'Error',
+        isTimeout
+          ? 'The model is taking more time to respond. Please try again.'
+          : (error.message || 'Failed to re-analyze food. Please try again.')
+      );
     } finally {
       setIsReanalyzing(false);
     }

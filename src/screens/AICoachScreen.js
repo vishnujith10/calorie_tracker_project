@@ -596,6 +596,13 @@ Use this memory to provide continuity and more personalized advice. Do not expli
     try {
       if (!chatSession && !genAI) throw new Error('AI is not configured (Missing API Key)');
 
+      const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+        ]);
+      };
+
       let aiText = '';
       try {
         if (!chatSession) {
@@ -610,10 +617,18 @@ Use this memory to provide continuity and more personalized advice. Do not expli
             ],
           });
           setChatSession(newChat);
-          const result = await newChat.sendMessage(userText);
+          const result = await raceWithTimeout(
+            newChat.sendMessage(userText),
+            18000,
+            'The model is taking more time to respond. Please try again.'
+          );
           aiText = result.response.text();
         } else {
-          const result = await chatSession.sendMessage(userText);
+          const result = await raceWithTimeout(
+            chatSession.sendMessage(userText),
+            18000,
+            'The model is taking more time to respond. Please try again.'
+          );
           aiText = result.response.text();
         }
       } catch (primaryError) {
@@ -640,7 +655,11 @@ Use this memory to provide continuity and more personalized advice. Do not expli
 
         const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
         const fallbackSession = fallbackModel.startChat({ history: fallbackHistory });
-        const fallbackResult = await fallbackSession.sendMessage(userText);
+        const fallbackResult = await raceWithTimeout(
+          fallbackSession.sendMessage(userText),
+          18000,
+          'The model is taking more time to respond. Please try again.'
+        );
         aiText = fallbackResult.response.text();
         setChatSession(fallbackSession);
       }
@@ -657,9 +676,12 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       messagesRef.current = finalMsgs;
     } catch (error) {
       console.error('AICoachScreen - handleSend error:', error);
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
       const errMsg = {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, I'm having trouble connecting right now. Please check your network or try again later.",
+        text: isTimeout
+          ? 'The model is taking more time to respond. Please try again.'
+          : "Sorry, I'm having trouble connecting right now. Please check your network or try again later.",
         isUser: false,
         timestamp: new Date().toISOString(),
       };

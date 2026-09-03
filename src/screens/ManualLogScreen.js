@@ -46,7 +46,14 @@ const ManualLogScreen = ({ route, navigation }) => {
     setIsLoading(true);
     setAnalysis(null);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+      const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+        ]);
+      };
+
+      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
       const prompt = `
         Analyze the food described in this text: "${foodQuery}".
         Your response MUST be a valid JSON object and nothing else.
@@ -77,20 +84,39 @@ const ManualLogScreen = ({ route, navigation }) => {
         EXAMPLE: If user enters "200g black beans", calculate nutrition for exactly 200g, not for a standard serving size.
       `;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      let lastError = null;
+      for (const modelName of models) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await raceWithTimeout(
+            model.generateContent(prompt),
+            15000,
+            'The model is taking more time to respond. Please try again.'
+          );
+          const response = await result.response;
+          const text = response.text();
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        setAnalysis(data);
-      } else {
-        throw new Error('Invalid JSON format from API.');
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            setAnalysis(data);
+            return;
+          } else {
+            throw new Error('Invalid JSON format from API.');
+          }
+        } catch (err) {
+          lastError = err;
+        }
       }
+
+      throw lastError || new Error('The model is taking more time to respond. Please try again.');
     } catch (error) {
       console.error("Error analyzing text:", error);
-      Alert.alert("AI Error", "Could not analyze the text. " + error.message);
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
+      Alert.alert(
+        isTimeout ? "Request Timeout" : "AI Error",
+        isTimeout ? "The model is taking more time to respond. Please try again." : ("Could not analyze the text. " + error.message)
+      );
     } finally {
       setIsLoading(false);
     }
@@ -207,21 +233,47 @@ IMPORTANT: Provide realistic fiber values based on the food type:
 - Processed foods: 0-2g fiber per serving
 
 EXAMPLE: If user enters "200g black beans", calculate nutrition for exactly 200g, not for a standard serving size.`;
-      const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        setAnalysis(data);
-        await setCachedAnalysisForItems(foodItems, data);
-        navigation.navigate('PostCalorieScreen', { analysis: data, mealName });
-      } else {
-        throw new Error('Invalid JSON format from AI.');
+      const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+        ]);
+      };
+
+      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+      let lastError = null;
+      for (const modelName of models) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await raceWithTimeout(
+            model.generateContent(prompt),
+            15000,
+            'The model is taking more time to respond. Please try again.'
+          );
+          const response = await result.response;
+          const text = response.text();
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            setAnalysis(data);
+            await setCachedAnalysisForItems(foodItems, data);
+            navigation.navigate('PostCalorieScreen', { analysis: data, mealName });
+            return;
+          } else {
+            throw new Error('Invalid JSON format from AI.');
+          }
+        } catch (err) {
+          lastError = err;
+        }
       }
+
+      throw lastError || new Error('The model is taking more time to respond. Please try again.');
     } catch (error) {
-      Alert.alert('AI Error', 'Could not analyze the meal. ' + error.message);
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
+      Alert.alert(
+        isTimeout ? 'Request Timeout' : 'AI Error',
+        isTimeout ? 'The model is taking more time to respond. Please try again.' : ('Could not analyze the meal. ' + error.message)
+      );
     } finally {
       setIsLoading(false);
     }

@@ -779,7 +779,18 @@ IMPORTANT RULES:
 The JSON object must have this structure: 
 { "transcription": "The meal text you analyzed", "items": [ { "name": "quantity + food item", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } ], "total": { "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number> } }`;
 
-          const result = await model.generateContent(prompt);
+          const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+            return Promise.race([
+              promise,
+              new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+            ]);
+          };
+
+          const result = await raceWithTimeout(
+            model.generateContent(prompt),
+            15000,
+            'The model is taking more time to respond. Please try again.'
+          );
           const response = await result.response;
           let text = response.text();
           console.log("PostCalorieScreen - Re-analysis raw response:", text);
@@ -834,12 +845,15 @@ The JSON object must have this structure:
         }
       }
 
-      throw lastError || new Error("All AI models are currently unavailable.");
+      throw lastError || new Error("The model is taking more time to respond. Please try again.");
     } catch (error) {
       console.error("PostCalorieScreen - Re-analysis error:", error);
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
       Alert.alert(
-        "Error",
-        error.message || "Failed to re-analyze food. Please try again.",
+        isTimeout ? "Request Timeout" : "Error",
+        isTimeout
+          ? "The model is taking more time to respond. Please try again."
+          : (error.message || "Failed to re-analyze food. Please try again."),
       );
     } finally {
       setIsReanalyzing(false);

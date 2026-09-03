@@ -6,7 +6,7 @@ const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants.expoConfig?.e
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // Helper: Timeout wrapper for network requests
-const raceWithTimeout = (promise, ms, timeoutMessage = 'Request timed out') => {
+const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
   return Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
@@ -49,7 +49,7 @@ Return ONLY valid JSON like this: {"items": ["Item 1", "Item 2"]}`;
     const result = await raceWithTimeout(
       model.generateContent([prompt, { inlineData: { mimeType: 'image/jpeg', data: imageData } }]),
       15000,
-      'Fast detection timed out'
+      'The model is taking more time to respond. Please try again.'
     );
     const text = await result.response.text();
     const data = extractJSON(text);
@@ -121,8 +121,8 @@ Guidelines:
           prompt,
           { inlineData: { mimeType: 'image/jpeg', data: imageData } },
         ]),
-        30000,
-        'Network request timed out. Please check your internet connection and try again.'
+        25000,
+        'The model is taking more time to respond. Please try again.'
       );
       
       const response = await result.response;
@@ -142,7 +142,7 @@ Guidelines:
     }
   }
 
-  throw lastError || new Error('All AI models are currently unavailable.');
+  throw lastError || new Error('The model is taking more time to respond. Please try again.');
 };
 
 /**
@@ -171,7 +171,7 @@ Return ONLY the text of the summary, no markdown, no JSON, just the friendly mes
       const result = await raceWithTimeout(
         model.generateContent(prompt),
         15000,
-        'Summary generation timed out.'
+        'The model is taking more time to respond. Please try again.'
       );
       return await result.response.text();
     } catch (error) {
@@ -236,8 +236,8 @@ Guidelines for your response:
       const lastMessage = messages[messages.length - 1].content;
       const result = await raceWithTimeout(
         chat.sendMessage(lastMessage),
-        20000,
-        'Response timed out. Please try again.'
+        18000,
+        'The model is taking more time to respond. Please try again.'
       );
       
       return result.response.text();
@@ -248,5 +248,5 @@ Guidelines for your response:
   }
 
   console.error('Ask Calora error:', lastError);
-  throw new Error('Sorry, I am having trouble connecting right now. Please try again later.');
+  throw new Error(lastError?.message?.includes('taking more time') ? lastError.message : 'The model is taking more time to respond. Please try again.');
 };

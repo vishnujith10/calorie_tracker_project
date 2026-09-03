@@ -352,7 +352,14 @@ const VoiceLoggingModal = ({ visible, onClose, onLog, mealType }) => {
   const handleVoiceToCalorie = async (uri) => {
     setIsLoading(true);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+      const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+        ]);
+      };
+
+      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
       const audioData = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const prompt = `Analyze the food items in this audio. Your response MUST be a single valid JSON object and nothing else. Do not include markdown formatting like \`\`\`json.
 
@@ -390,29 +397,49 @@ const VoiceLoggingModal = ({ visible, onClose, onLog, mealType }) => {
 
 The JSON object must have this structure: 
 { "transcription": "The full text of what you heard", "items": [ { "name": "EXACT_QUANTITY + food item", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number> } ], "total": { "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number> } }`;
-      const result = await model.generateContent([prompt, { inlineData: { mimeType: 'audio/mp4', data: audioData } }]);
-      const response = await result.response;
-      let text = response.text();
-      
-      console.log('CalorieFooter - Raw AI response:', text);
-      
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const jsonString = jsonMatch[0];
-        console.log('CalorieFooter - Extracted JSON:', jsonString);
-        const data = JSON.parse(jsonString);
-        if (!data.total || !Array.isArray(data.items) || !data.transcription) {
-          throw new Error('Invalid JSON structure from API.');
+
+      let lastError = null;
+      for (const modelName of models) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await raceWithTimeout(
+            model.generateContent([prompt, { inlineData: { mimeType: 'audio/mp4', data: audioData } }]),
+            20000,
+            'The model is taking more time to respond. Please try again.'
+          );
+          const response = await result.response;
+          let text = response.text();
+          
+          console.log('CalorieFooter - Raw AI response:', text);
+          
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const jsonString = jsonMatch[0];
+            console.log('CalorieFooter - Extracted JSON:', jsonString);
+            const data = JSON.parse(jsonString);
+            if (!data.total || !Array.isArray(data.items) || !data.transcription) {
+              throw new Error('Invalid JSON structure from API.');
+            }
+            setTranscribedText(data.transcription);
+            const foodName = data.items.map(item => item.name).join(', ');
+            const mergedData = { food_name: foodName, ...data.total };
+            setNutritionData(mergedData);
+            return;
+          } else {
+            throw new Error('Invalid JSON format from API. No JSON object found.');
+          }
+        } catch (err) {
+          lastError = err;
         }
-        setTranscribedText(data.transcription);
-        const foodName = data.items.map(item => item.name).join(', ');
-        const mergedData = { food_name: foodName, ...data.total };
-        setNutritionData(mergedData);
-      } else {
-        throw new Error('Invalid JSON format from API. No JSON object found.');
       }
+
+      throw lastError || new Error('The model is taking more time to respond. Please try again.');
     } catch (error) {
-      Alert.alert("AI Error", "Could not analyze the audio. " + error.message);
+      const isTimeout = error?.message?.includes('taking more time') || error?.message?.includes('timed out');
+      Alert.alert(
+        isTimeout ? 'Request Timeout' : 'AI Error',
+        isTimeout ? 'The model is taking more time to respond. Please try again.' : ('Could not analyze the audio. ' + error.message)
+      );
     } finally {
       setIsLoading(false);
     }

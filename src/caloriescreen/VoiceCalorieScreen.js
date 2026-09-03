@@ -221,7 +221,7 @@ const VoiceCalorieScreen = ({ navigation, route }) => {
   };
 
   // Utility: timeout wrapper for promises
-  const raceWithTimeout = (promise, ms, timeoutMessage = 'Request timed out') => {
+  const raceWithTimeout = (promise, ms, timeoutMessage = 'The model is taking more time to respond. Please try again.') => {
     return Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
@@ -248,7 +248,7 @@ const VoiceCalorieScreen = ({ navigation, route }) => {
               { inlineData: { mimeType: "audio/m4a", data: audioData } },
             ]),
             12000,
-            'Transcription timed out'
+            'The model is taking more time to respond. Please try again.'
           );
           const response = await result.response;
           text = response.text().trim();
@@ -350,8 +350,8 @@ The JSON object must have this structure:
               prompt,
               { inlineData: { mimeType: "audio/m4a", data: audioData } },
             ]),
-            30000,
-            'Network request timed out. Please check your internet connection and try again.'
+            20000,
+            'The model is taking more time to respond. Please try again.'
           );
           const response = await result.response;
           text = response.text();
@@ -401,28 +401,25 @@ The JSON object must have this structure:
           .map((item) => item.name)
           .join(", ");
 
-        console.log("VoiceCalorieScreen - Generated data:", data);
-        console.log("VoiceCalorieScreen - Items:", data.items);
-        console.log("VoiceCalorieScreen - Clean food name:", cleanFoodName);
-        console.log("VoiceCalorieScreen - Total nutrition:", data.total);
+        console.log(
+          "VoiceCalorieScreen - Clean food name for next screen:",
+          cleanFoodName
+        );
 
+        // Auto-navigate to VoicePostCalorieScreen with analysis data
         navigation.replace("VoicePostCalorieScreen", {
           analysis: {
-            total: {
-              calories: data.total.calories,
-              protein: data.total.protein,
-              fat: data.total.fat,
-              carbs: data.total.carbs,
-              fiber: data.total.fiber || 0,
-            },
+            dish_name: cleanFoodName,
             items: data.items,
+            total: data.total,
           },
+          transcription: data.transcription,
           cleanFoodName: cleanFoodName,
         });
         return;
       } else {
         throw new Error(
-          "Invalid JSON format from API. No JSON object found."
+          "The model is taking more time to respond. Please try again."
         );
       }
     } catch (error) {
@@ -432,11 +429,12 @@ The JSON object must have this structure:
       if (
         msg.includes("timed out") ||
         msg.includes("timeout") ||
+        msg.includes("taking more time") ||
         msg.includes("network request timed out")
       ) {
         Alert.alert(
-          "Network Error",
-          "Connection is slow or timed out. Please check your internet connection and try again."
+          "Request Timeout",
+          "The model is taking more time to respond. Please try again."
         );
       } else if (
         msg.includes("fetch") ||
