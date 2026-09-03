@@ -175,7 +175,11 @@ const SavedMealsScreen = ({ navigation, route }) => {
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        navigation.navigate("Home");
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate("Home");
+        }
         return true;
       };
 
@@ -399,7 +403,13 @@ const SavedMealsScreen = ({ navigation, route }) => {
       <View style={styles.headerWrap}>
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("Home");
+              }
+            }}
             style={styles.headerIconBtn}
             activeOpacity={0.8}
           >
