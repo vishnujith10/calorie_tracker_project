@@ -3,7 +3,6 @@ export default {
   expo: {
     name: "Calora",
     slug: "calora",
-    owner: "vishnu242552",
     version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
@@ -48,10 +47,10 @@ export default {
       favicon: "./assets/favicon.png",
     },
     extra: {
-      EXPO_PUBLIC_GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
       eas: {
-        projectId: "f96f8480-5291-458b-aa94-fe04125b0bdd",
+        projectId: "7a0e2d37-0acf-44d7-889c-883609365838",
       },
+      EXPO_PUBLIC_GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY,
