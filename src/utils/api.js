@@ -6,7 +6,7 @@ import supabase from "../lib/supabase";
 const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
   Constants.expoConfig?.extra?.supabaseUrl ||
-  "https://tkuyjtdycmmkvunurlxj.supabase.co";
+  "https://egqigyjixunzbvxnojpq.supabase.co";
 const BASE_URL = supabaseUrl.replace(".supabase.co", ".functions.supabase.co");
 const ANALYZE_FOOD_FUNCTION = `${BASE_URL}/analyze-food`;
 

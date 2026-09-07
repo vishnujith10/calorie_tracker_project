@@ -274,8 +274,8 @@ Guidelines:
 
         if (!authToken) throw new Error('No auth token available');
 
-        const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
-        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://egqigyjixunzbvxnojpq.supabase.co';
+        const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
         const uploadUrl = `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`;
         console.log('Upload - step 4: uploadUrl:', uploadUrl);
 
@@ -368,8 +368,8 @@ Guidelines:
       if (photoUri && authToken) {
         try {
           const fileName = `food_photos/${user_id}_${Date.now()}.jpg`;
-          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
-          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://egqigyjixunzbvxnojpq.supabase.co';
+          const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
           const uploadUrl = `${supabaseUrl}/storage/v1/object/food-photos/${fileName}`;
           console.log('SaveMeal - uploading photo to:', uploadUrl);
 

@@ -880,8 +880,8 @@ The JSON object must have this structure:
           const fileName = `food-photos/${user.id}/${Date.now()}.jpg`;
           const { data: { session } } = await supabase.auth.getSession();
           const authToken = session?.access_token;
-          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
-          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://egqigyjixunzbvxnojpq.supabase.co';
+          const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
           if (authToken) {
             const uploadResult = await FileSystem.uploadAsync(
@@ -973,8 +973,8 @@ The JSON object must have this structure:
           const fileName = `food-photos/${user.id}/${Date.now()}.jpg`;
           const { data: { session } } = await supabase.auth.getSession();
           const authToken = session?.access_token;
-          const supabaseUrl = 'https://tkuyjtdycmmkvunurlxj.supabase.co';
-          const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+          const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://egqigyjixunzbvxnojpq.supabase.co';
+          const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
           if (authToken) {
             const uploadResult = await FileSystem.uploadAsync(

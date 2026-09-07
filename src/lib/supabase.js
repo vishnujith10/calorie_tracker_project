@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
 // Use environment variables directly (from eas.json in production)
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || Constants.expoConfig?.extra?.supabaseUrl || 'https://tkuyjtdycmmkvunurlxj.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || Constants.expoConfig?.extra?.supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdXlqdGR5Y21ta3Z1bnVybHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzIwMDYsImV4cCI6MjA4OTQwODAwNn0.Vs1fjhWuGK93s2vbe3mcj-nLQaCcKXGVQW3LjnpD2VY';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || Constants.expoConfig?.extra?.supabaseUrl || 'https://egqigyjixunzbvxnojpq.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || Constants.expoConfig?.extra?.supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncWlneWppeHVuemJ2eG5vanBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODIzMjEsImV4cCI6MjEwNDM1ODMyMX0.78lIqwt-e2Xnn_fAeRcu4_EDcAfTNFF7hbuB_PFeuNY';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

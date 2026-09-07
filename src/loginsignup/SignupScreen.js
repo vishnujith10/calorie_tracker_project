@@ -202,7 +202,7 @@ const SignupScreen = ({ navigation }) => {
         
         const { error: profileError } = await supabase
           .from('user_profile')
-          .insert([userProfile]);
+          .upsert(userProfile);
 
         if (profileError) {
           console.error('Profile insert error:', profileError);
@@ -295,7 +295,7 @@ const SignupScreen = ({ navigation }) => {
         
         const { error: insertError } = await supabase
           .from('user_profile')
-          .insert([userProfile]);
+          .upsert(userProfile);
         
         if (insertError) {
           console.error('Google OAuth: Profile creation error:', insertError);
