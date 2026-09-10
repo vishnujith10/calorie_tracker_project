@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -28,6 +29,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 import { clearAllGlobalCaches } from "../utils/clearAllCaches";
+
+const SETTINGS_STORAGE_KEY = "@calora_app_settings";
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -64,9 +67,9 @@ const AppSettingsScreen = () => {
     return date;
   };
 
-  const getDefaultWorkoutTime = () => {
+  const getDefaultHydrationTime = () => {
     const date = new Date();
-    date.setHours(17, 30, 0, 0);
+    date.setHours(11, 0, 0, 0);
     return date;
   };
 
@@ -100,8 +103,8 @@ const AppSettingsScreen = () => {
   const [mealReminders, setMealReminders] = useState(() =>
     getCachedOrDefault("mealReminders", false),
   );
-  const [workoutReminders, setWorkoutReminders] = useState(() =>
-    getCachedOrDefault("workoutReminders", false),
+  const [hydrationReminders, setHydrationReminders] = useState(() =>
+    getCachedOrDefault("hydrationReminders", false),
   );
   const [sleepReminders, setSleepReminders] = useState(() =>
     getCachedOrDefault("sleepReminders", false),
@@ -122,21 +125,21 @@ const AppSettingsScreen = () => {
   const [mealReminderTime, setMealReminderTime] = useState(() =>
     getCachedTime("mealReminderTime", getDefaultMealTime),
   );
-  const [workoutReminderTime, setWorkoutReminderTime] = useState(() =>
-    getCachedTime("workoutReminderTime", getDefaultWorkoutTime),
+  const [hydrationReminderTime, setHydrationReminderTime] = useState(() =>
+    getCachedTime("hydrationReminderTime", getDefaultHydrationTime),
   );
   const [sleepReminderTime, setSleepReminderTime] = useState(() =>
     getCachedTime("sleepReminderTime", getDefaultSleepTime),
   );
 
   const [showMealTimePicker, setShowMealTimePicker] = useState(false);
-  const [showWorkoutTimePicker, setShowWorkoutTimePicker] = useState(false);
+  const [showHydrationTimePicker, setShowHydrationTimePicker] = useState(false);
   const [showSleepTimePicker, setShowSleepTimePicker] = useState(false);
 
   // Notification IDs storage
   const notificationIdsRef = useRef({
     meal: null,
-    workout: null,
+    hydration: null,
     sleep: null,
   });
 
@@ -146,7 +149,7 @@ const AppSettingsScreen = () => {
   // Scheduling lock to prevent concurrent scheduling of the same notification type
   const schedulingLockRef = useRef({
     meal: false,
-    workout: false,
+    hydration: false,
     sleep: false,
   });
 
@@ -161,8 +164,7 @@ const AppSettingsScreen = () => {
     getCachedOrDefault("focusAreas", {
       calories: true,
       sleep: true,
-      workout: true,
-      Hydration: false,
+      hydration: true,
     }),
   );
 
@@ -180,14 +182,9 @@ const AppSettingsScreen = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
 
-  // Load settings from database
+  // Load settings from local storage
   const loadSettings = useCallback(async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
       // Check cache first (prevent unnecessary re-renders)
       const now = Date.now();
       const timeSinceLastFetch = now - globalSettingsCache.lastFetchTime;
@@ -195,18 +192,16 @@ const AppSettingsScreen = () => {
         timeSinceLastFetch < globalSettingsCache.CACHE_DURATION;
 
       if (isCacheValid && globalSettingsCache.cachedData) {
-        // Cache is valid, restore from cache without fetching
         const cached = globalSettingsCache.cachedData;
 
-        // Use functional updates to avoid dependency on current state values
         setDailyReminders((prev) =>
           prev !== cached.dailyReminders ? cached.dailyReminders : prev,
         );
         setMealReminders((prev) =>
           prev !== cached.mealReminders ? cached.mealReminders : prev,
         );
-        setWorkoutReminders((prev) =>
-          prev !== cached.workoutReminders ? cached.workoutReminders : prev,
+        setHydrationReminders((prev) =>
+          prev !== cached.hydrationReminders ? cached.hydrationReminders : prev,
         );
         setSleepReminders((prev) =>
           prev !== cached.sleepReminders ? cached.sleepReminders : prev,
@@ -224,14 +219,14 @@ const AppSettingsScreen = () => {
             return prev;
           });
         }
-        if (cached.workoutReminderTime) {
-          const [hours, minutes] = cached.workoutReminderTime.split(":");
-          setWorkoutReminderTime((prev) => {
+        if (cached.hydrationReminderTime) {
+          const [hours, minutes] = cached.hydrationReminderTime.split(":");
+          setHydrationReminderTime((prev) => {
             const prevTimeStr = prev.toTimeString().slice(0, 5);
-            if (prevTimeStr !== cached.workoutReminderTime) {
-              const workoutTime = new Date();
-              workoutTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-              return workoutTime;
+            if (prevTimeStr !== cached.hydrationReminderTime) {
+              const hydrationTime = new Date();
+              hydrationTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+              return hydrationTime;
             }
             return prev;
           });
@@ -269,38 +264,28 @@ const AppSettingsScreen = () => {
           prev !== cached.language ? cached.language : prev,
         );
 
-        return; // Skip database fetch
+        return; // Skip storage fetch
       }
 
-      // Cache invalid or doesn't exist, fetch from database
-      const { data, error } = await supabase
-        .from("user_app_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows returned
-        console.error("Error loading settings:", error);
-        return;
-      }
+      // Fetch from AsyncStorage
+      const raw = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
+      const data = raw ? JSON.parse(raw) : null;
 
       if (data) {
         // Update cache
         globalSettingsCache.cachedData = {
           dailyReminders: data.daily_reminders ?? false,
           mealReminders: data.meal_reminders ?? false,
-          workoutReminders: data.workout_reminders ?? false,
+          hydrationReminders: data.hydration_reminders ?? false,
           sleepReminders: data.sleep_reminders ?? false,
           mealReminderTime: data.meal_reminder_time,
-          workoutReminderTime: data.workout_reminder_time,
+          hydrationReminderTime: data.hydration_reminder_time,
           sleepReminderTime: data.sleep_reminder_time,
           aiInsights: data.ai_insights ?? true,
           insightFrequency: data.insight_frequency ?? "Weekly",
           focusAreas: data.focus_areas || {
             calories: true,
             sleep: true,
-            workout: true,
             Hydration: false,
           },
           anonymousDataSharing: data.anonymous_data_sharing ?? true,
@@ -308,7 +293,6 @@ const AppSettingsScreen = () => {
         };
         globalSettingsCache.lastFetchTime = now;
 
-        // Use functional updates to avoid dependency on current state values
         setDailyReminders((prev) =>
           prev !== globalSettingsCache.cachedData.dailyReminders
             ? globalSettingsCache.cachedData.dailyReminders
@@ -319,9 +303,9 @@ const AppSettingsScreen = () => {
             ? globalSettingsCache.cachedData.mealReminders
             : prev,
         );
-        setWorkoutReminders((prev) =>
-          prev !== globalSettingsCache.cachedData.workoutReminders
-            ? globalSettingsCache.cachedData.workoutReminders
+        setHydrationReminders((prev) =>
+          prev !== globalSettingsCache.cachedData.hydrationReminders
+            ? globalSettingsCache.cachedData.hydrationReminders
             : prev,
         );
         setSleepReminders((prev) =>
@@ -330,7 +314,6 @@ const AppSettingsScreen = () => {
             : prev,
         );
 
-        // Load reminder times using functional updates
         if (data.meal_reminder_time) {
           const [hours, minutes] = data.meal_reminder_time.split(":");
           setMealReminderTime((prev) => {
@@ -343,14 +326,14 @@ const AppSettingsScreen = () => {
             return prev;
           });
         }
-        if (data.workout_reminder_time) {
-          const [hours, minutes] = data.workout_reminder_time.split(":");
-          setWorkoutReminderTime((prev) => {
+        if (data.hydration_reminder_time) {
+          const [hours, minutes] = data.hydration_reminder_time.split(":");
+          setHydrationReminderTime((prev) => {
             const prevTimeStr = prev.toTimeString().slice(0, 5);
-            if (prevTimeStr !== data.workout_reminder_time) {
-              const workoutTime = new Date();
-              workoutTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-              return workoutTime;
+            if (prevTimeStr !== data.hydration_reminder_time) {
+              const hydrationTime = new Date();
+              hydrationTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+              return hydrationTime;
             }
             return prev;
           });
@@ -368,7 +351,6 @@ const AppSettingsScreen = () => {
           });
         }
 
-        // Load AI Insights settings using functional updates
         setAiInsights((prev) =>
           prev !== globalSettingsCache.cachedData.aiInsights
             ? globalSettingsCache.cachedData.aiInsights
@@ -388,15 +370,11 @@ const AppSettingsScreen = () => {
             ? globalSettingsCache.cachedData.focusAreas
             : prev;
         });
-
-        // Load Privacy & Data settings using functional updates
         setAnonymousDataSharing((prev) =>
           prev !== globalSettingsCache.cachedData.anonymousDataSharing
             ? globalSettingsCache.cachedData.anonymousDataSharing
             : prev,
         );
-
-        // Load General settings using functional updates
         setLanguage((prev) =>
           prev !== globalSettingsCache.cachedData.language
             ? globalSettingsCache.cachedData.language
@@ -406,34 +384,26 @@ const AppSettingsScreen = () => {
     } catch (error) {
       console.error("Error loading settings:", error);
     }
-  }, []); // Empty deps - loadSettings should only run on mount, not when state changes
+  }, []);
 
-  // Save settings to database
+  // Save settings to local storage
   const saveSettings = useCallback(async () => {
-    // Don't save settings if user is logging out
     if (isLoggingOutRef.current) {
-      console.log("⏸️ Skipping settings save - user is logging out");
       return;
     }
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
       const mealTimeStr = mealReminderTime.toTimeString().slice(0, 5);
-      const workoutTimeStr = workoutReminderTime.toTimeString().slice(0, 5);
+      const hydrationTimeStr = hydrationReminderTime.toTimeString().slice(0, 5);
       const sleepTimeStr = sleepReminderTime.toTimeString().slice(0, 5);
 
       const settingsData = {
-        user_id: user.id,
         daily_reminders: dailyReminders,
         meal_reminders: mealReminders,
-        workout_reminders: workoutReminders,
+        hydration_reminders: hydrationReminders,
         sleep_reminders: sleepReminders,
         meal_reminder_time: mealTimeStr,
-        workout_reminder_time: workoutTimeStr,
+        hydration_reminder_time: hydrationTimeStr,
         sleep_reminder_time: sleepTimeStr,
         ai_insights: aiInsights,
         insight_frequency: insightFrequency,
@@ -443,36 +413,27 @@ const AppSettingsScreen = () => {
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from("user_app_settings")
-        .upsert(settingsData, {
-          onConflict: "user_id",
-        });
+      await AsyncStorage.setItem(
+        SETTINGS_STORAGE_KEY,
+        JSON.stringify(settingsData),
+      );
 
-      if (error) {
-        console.error("Error saving settings:", error);
-      } else {
-        // Update cache immediately after successful save to prevent stale data
-        globalSettingsCache.cachedData = {
-          dailyReminders,
-          mealReminders,
-          workoutReminders,
-          sleepReminders,
-          mealReminderTime: mealTimeStr,
-          workoutReminderTime: workoutTimeStr,
-          sleepReminderTime: sleepTimeStr,
-          aiInsights,
-          insightFrequency,
-          focusAreas,
-          anonymousDataSharing,
-          language,
-        };
-        globalSettingsCache.lastFetchTime = Date.now();
-        console.log("✅ Cache updated with sleep time:", sleepTimeStr);
-        console.log("✅ Settings saved successfully");
-      }
+      globalSettingsCache.cachedData = {
+        dailyReminders,
+        mealReminders,
+        hydrationReminders,
+        sleepReminders,
+        mealReminderTime: mealTimeStr,
+        hydrationReminderTime: hydrationTimeStr,
+        sleepReminderTime: sleepTimeStr,
+        aiInsights,
+        insightFrequency,
+        focusAreas,
+        anonymousDataSharing,
+        language,
+      };
+      globalSettingsCache.lastFetchTime = Date.now();
     } catch (error) {
-      // Don't log errors if user is logging out
       if (!isLoggingOutRef.current) {
         console.error("Error saving settings:", error);
       }
@@ -480,10 +441,10 @@ const AppSettingsScreen = () => {
   }, [
     dailyReminders,
     mealReminders,
-    workoutReminders,
+    hydrationReminders,
     sleepReminders,
     mealReminderTime,
-    workoutReminderTime,
+    hydrationReminderTime,
     sleepReminderTime,
     aiInsights,
     insightFrequency,
@@ -559,11 +520,11 @@ const AppSettingsScreen = () => {
         "Meal time! Take a moment to log what you're eating. 🍎",
         "Don't forget to log your meal! Every bite counts towards your goals. 💪",
       ],
-      workout: [
-        "💪 Ready to move? Even 10 minutes of activity makes a difference!",
-        "Time for some movement! Your body will thank you. 🏃‍♀️",
-        "Exercise reminder: Every step counts towards your health goals! 🏋️",
-        "Feel like moving today? A quick workout can boost your energy! ⚡",
+      hydration: [
+        "💧 Stay hydrated! Time to drink a glass of water.",
+        "Hydration check! Drink some water to keep your energy up. 🌊",
+        "Don't forget your water intake! Every glass counts. 🚰",
+        "Time for a water break! Keep your body refreshed and hydrated. 💧",
       ],
       sleep: [
         "🌙 Time to wind down! Quality sleep is essential for your health.",
@@ -583,8 +544,8 @@ const AppSettingsScreen = () => {
       const expectedTitle =
         type === "meal"
           ? "Meal Reminder"
-          : type === "workout"
-            ? "Workout Reminder"
+          : type === "hydration"
+            ? "Hydration Reminder"
             : "Sleep Reminder";
 
       // Get all scheduled notifications
@@ -684,8 +645,8 @@ const AppSettingsScreen = () => {
         const expectedTitle =
           type === "meal"
             ? "Meal Reminder"
-            : type === "workout"
-              ? "Workout Reminder"
+            : type === "hydration"
+              ? "Hydration Reminder"
               : "Sleep Reminder";
         const existingCount = allScheduled.filter(
           (n) => n.content.title === expectedTitle,
@@ -698,22 +659,29 @@ const AppSettingsScreen = () => {
           await cancelNotification(type);
         }
 
-        // Use specific date/time trigger (most reliable)
+        // Schedule daily recurring notification natively via OS (Android AlarmManager / iOS UNCalendarNotificationTrigger)
+        // This ensures the alarm fires every day even when the app is completely closed or device rebooted
         const notificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: expectedTitle,
             body: getNotificationMessages(type),
-            sound: true,
+            sound: "default",
             priority: Notifications.AndroidNotificationPriority.HIGH,
+            channelId: "default",
           },
-          trigger: scheduledTime, // Simple date trigger
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour: hours,
+            minute: minutes,
+            channelId: "default",
+          },
         });
 
         // Store notification ID
         notificationIdsRef.current[type] = notificationId;
 
         console.log(
-          `✅ Scheduled ${type} notification for ${scheduledTime.toLocaleString()} (ID: ${notificationId})`,
+          `✅ Scheduled daily recurring ${type} notification for ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} (ID: ${notificationId})`,
         );
 
         // Final verification: Check for duplicates and cancel extras
@@ -745,7 +713,6 @@ const AppSettingsScreen = () => {
           }
         }
 
-        // Debug: Final count
         if (__DEV__) {
           const finalCheck =
             await Notifications.getAllScheduledNotificationsAsync();
@@ -759,104 +726,11 @@ const AppSettingsScreen = () => {
       } catch (error) {
         console.error(`Error scheduling ${type} notification:`, error);
       } finally {
-        // Always release the lock, even if there's an error
         schedulingLockRef.current[type] = false;
       }
     },
     [cancelNotification],
   );
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cancelNotification("meal");
-      cancelNotification("workout");
-      cancelNotification("sleep");
-    };
-  }, [cancelNotification]);
-
-  // Handle notification received (reschedule for next day) - Prevent duplicate reschedules
-  const rescheduleLockRef = useRef({
-    meal: false,
-    workout: false,
-    sleep: false,
-  });
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(
-      async (notification) => {
-        console.log(
-          "📬 Notification received:",
-          notification.request.content.title,
-        );
-
-        // Determine which type and reschedule for tomorrow
-        const title = notification.request.content.title;
-
-        // Prevent duplicate reschedules if multiple notifications fire at once
-        if (title?.includes("Meal") && mealReminders && dailyReminders) {
-          if (rescheduleLockRef.current.meal) {
-            console.log(
-              "⏸️ Meal notification reschedule already in progress, skipping duplicate",
-            );
-            return;
-          }
-          rescheduleLockRef.current.meal = true;
-          console.log("🔄 Rescheduling meal notification for tomorrow");
-          await scheduleNotification("meal", mealReminderTime, true);
-          // Release lock after a short delay
-          setTimeout(() => {
-            rescheduleLockRef.current.meal = false;
-          }, 2000);
-        } else if (
-          title?.includes("Workout") &&
-          workoutReminders &&
-          dailyReminders
-        ) {
-          if (rescheduleLockRef.current.workout) {
-            console.log(
-              "⏸️ Workout notification reschedule already in progress, skipping duplicate",
-            );
-            return;
-          }
-          rescheduleLockRef.current.workout = true;
-          console.log("🔄 Rescheduling workout notification for tomorrow");
-          await scheduleNotification("workout", workoutReminderTime, true);
-          setTimeout(() => {
-            rescheduleLockRef.current.workout = false;
-          }, 2000);
-        } else if (
-          title?.includes("Sleep") &&
-          sleepReminders &&
-          dailyReminders
-        ) {
-          if (rescheduleLockRef.current.sleep) {
-            console.log(
-              "⏸️ Sleep notification reschedule already in progress, skipping duplicate",
-            );
-            return;
-          }
-          rescheduleLockRef.current.sleep = true;
-          console.log("🔄 Rescheduling sleep notification for tomorrow");
-          await scheduleNotification("sleep", sleepReminderTime, true);
-          setTimeout(() => {
-            rescheduleLockRef.current.sleep = false;
-          }, 2000);
-        }
-      },
-    );
-
-    return () => subscription.remove();
-  }, [
-    mealReminders,
-    workoutReminders,
-    sleepReminders,
-    dailyReminders,
-    mealReminderTime,
-    workoutReminderTime,
-    sleepReminderTime,
-    scheduleNotification,
-  ]);
 
   // SEPARATE useEffects for each notification type to prevent cascade updates
   // Handle meal reminders toggle
@@ -869,7 +743,7 @@ const AppSettingsScreen = () => {
       } else {
         await cancelNotification("meal");
       }
-      // Save settings to database
+      // Save settings to local storage
       await saveSettings();
     }, 300);
 
@@ -885,45 +759,45 @@ const AppSettingsScreen = () => {
         console.log("⏰ Meal time changed, rescheduling...");
         await scheduleNotification("meal", mealReminderTime, true);
       }
-      // Save settings to database
+      // Save settings to local storage
       await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
   }, [mealReminderTime, saveSettings]);
 
-  // Handle workout reminders toggle
+  // Handle hydration reminders toggle
   useEffect(() => {
     if (isInitialMount.current) return;
 
     const timeoutId = setTimeout(async () => {
-      if (dailyReminders && workoutReminders) {
-        await scheduleNotification("workout", workoutReminderTime, true);
+      if (dailyReminders && hydrationReminders) {
+        await scheduleNotification("hydration", hydrationReminderTime, true);
       } else {
-        await cancelNotification("workout");
+        await cancelNotification("hydration");
       }
-      // Save settings to database
+      // Save settings to local storage
       await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [workoutReminders, dailyReminders, saveSettings]);
+  }, [hydrationReminders, dailyReminders, saveSettings]);
 
-  // Handle workout time changes
+  // Handle hydration time changes
   useEffect(() => {
     if (isInitialMount.current) return;
 
     const timeoutId = setTimeout(async () => {
-      if (dailyReminders && workoutReminders) {
-        console.log("⏰ Workout time changed, rescheduling...");
-        await scheduleNotification("workout", workoutReminderTime, true);
+      if (dailyReminders && hydrationReminders) {
+        console.log("⏰ Hydration time changed, rescheduling...");
+        await scheduleNotification("hydration", hydrationReminderTime, true);
       }
-      // Save settings to database
+      // Save settings to local storage
       await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [workoutReminderTime, saveSettings]);
+  }, [hydrationReminderTime, saveSettings]);
 
   // Handle sleep reminders toggle
   useEffect(() => {
@@ -1008,7 +882,7 @@ const AppSettingsScreen = () => {
     setDailyReminders(value);
     if (!value) {
       setMealReminders(false);
-      setWorkoutReminders(false);
+      setHydrationReminders(false);
       setSleepReminders(false);
     }
   };
@@ -1020,11 +894,11 @@ const AppSettingsScreen = () => {
     setMealReminders(value);
   };
 
-  const handleWorkoutRemindersToggle = (value) => {
+  const handleHydrationRemindersToggle = (value) => {
     if (value && !dailyReminders) {
       return;
     }
-    setWorkoutReminders(value);
+    setHydrationReminders(value);
   };
 
   const handleSleepRemindersToggle = (value) => {
@@ -1056,15 +930,15 @@ const AppSettingsScreen = () => {
     }
   };
 
-  const handleWorkoutTimeChange = (event, selectedTime) => {
+  const handleHydrationTimeChange = (event, selectedTime) => {
     if (Platform.OS === "android") {
-      setShowWorkoutTimePicker(false);
+      setShowHydrationTimePicker(false);
       if (event.type === "set" && selectedTime) {
-        setWorkoutReminderTime(selectedTime);
+        setHydrationReminderTime(selectedTime);
       }
     } else {
       if (selectedTime) {
-        setWorkoutReminderTime(selectedTime);
+        setHydrationReminderTime(selectedTime);
       }
     }
   };
@@ -1122,7 +996,7 @@ const AppSettingsScreen = () => {
             // Cancel notifications in parallel (non-blocking)
             Promise.all([
               cancelNotification("meal"),
-              cancelNotification("workout"),
+              cancelNotification("hydration"),
               cancelNotification("sleep"),
             ]).catch((err) => {
               // Silently handle notification cancellation errors
@@ -1362,12 +1236,12 @@ const AppSettingsScreen = () => {
                 !dailyReminders ? null : () => setShowMealTimePicker(true),
               )}
               {renderToggleItem(
-                "Workout Reminders",
-                workoutReminders,
-                handleWorkoutRemindersToggle,
-                formatTime(workoutReminderTime),
+                "Hydration Reminders",
+                hydrationReminders,
+                handleHydrationRemindersToggle,
+                formatTime(hydrationReminderTime),
                 !dailyReminders,
-                !dailyReminders ? null : () => setShowWorkoutTimePicker(true),
+                !dailyReminders ? null : () => setShowHydrationTimePicker(true),
               )}
               {renderToggleItem(
                 "Sleep Reminders",
@@ -1416,33 +1290,33 @@ const AppSettingsScreen = () => {
               </Modal>
 
               <Modal
-                visible={showWorkoutTimePicker}
+                visible={showHydrationTimePicker}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setShowWorkoutTimePicker(false)}
+                onRequestClose={() => setShowHydrationTimePicker(false)}
               >
                 <View style={styles.modalOverlay}>
                   <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
                       <TouchableOpacity
-                        onPress={() => setShowWorkoutTimePicker(false)}
+                        onPress={() => setShowHydrationTimePicker(false)}
                       >
                         <Text style={styles.modalCancel}>Cancel</Text>
                       </TouchableOpacity>
                       <Text style={styles.modalTitle}>
-                        Workout Reminder Time
+                        Hydration Reminder Time
                       </Text>
                       <TouchableOpacity
-                        onPress={() => setShowWorkoutTimePicker(false)}
+                        onPress={() => setShowHydrationTimePicker(false)}
                       >
                         <Text style={styles.modalDone}>Done</Text>
                       </TouchableOpacity>
                     </View>
                     <DateTimePicker
-                      value={workoutReminderTime}
+                      value={hydrationReminderTime}
                       mode="time"
                       display="spinner"
-                      onChange={handleWorkoutTimeChange}
+                      onChange={handleHydrationTimeChange}
                       style={styles.timePicker}
                     />
                   </View>
@@ -1494,12 +1368,12 @@ const AppSettingsScreen = () => {
                   onChange={handleMealTimeChange}
                 />
               )}
-              {showWorkoutTimePicker && (
+              {showHydrationTimePicker && (
                 <DateTimePicker
-                  value={workoutReminderTime}
+                  value={hydrationReminderTime}
                   mode="time"
                   display="default"
-                  onChange={handleWorkoutTimeChange}
+                  onChange={handleHydrationTimeChange}
                 />
               )}
               {showSleepTimePicker && (

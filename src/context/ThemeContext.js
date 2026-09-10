@@ -18,32 +18,10 @@ export const ThemeProvider = ({ children }) => {
 
   const loadTheme = async () => {
     try {
-      // First, try to load from AsyncStorage (works even when logged out)
       const storedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
       if (storedTheme && (storedTheme === 'Light' || storedTheme === 'Dark')) {
         setTheme(storedTheme);
-      }
-
-      // Then, try to load from database if user is logged in
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from('user_app_settings')
-          .select('theme')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!error && data?.theme) {
-          // Update theme from database and sync to AsyncStorage
-          setTheme(data.theme);
-          await AsyncStorage.setItem(THEME_STORAGE_KEY, data.theme);
-        } else if (error && error.code !== 'PGRST116' && error.code !== 'PGRST205') {
-          console.error('Error loading theme from database:', error);
-        }
-      }
-
-      // If no theme found anywhere, default to Light
-      if (!storedTheme && !user) {
+      } else {
         setTheme('Light');
       }
     } catch (error) {
@@ -56,34 +34,8 @@ export const ThemeProvider = ({ children }) => {
 
   const updateTheme = async (newTheme) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
       setTheme(newTheme);
-
-      if (!user) {
-        return;
-      }
-
-      const { error } = await supabase
-        .from('user_app_settings')
-        .upsert(
-          {
-            user_id: user.id,
-            theme: newTheme,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'user_id',
-          }
-        );
-
-      if (error && error.code !== 'PGRST205') {
-        console.error('Error saving theme:', error);
-        Alert.alert('Error', 'Failed to save theme preference.');
-        return;
-      }
-
-      // Already set above
     } catch (error) {
       console.error('Error updating theme:', error);
     }
