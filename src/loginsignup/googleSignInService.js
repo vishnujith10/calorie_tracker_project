@@ -1,11 +1,24 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
 import 'react-native-url-polyfill/auto';
 import supabase from '../lib/supabase';
 
+// Helper to get Google Web Client ID from various config sources
+export const getGoogleWebClientId = () => {
+  return (
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    process.env.GOOGLE_WEB_CLIENT_ID ||
+    Constants.expoConfig?.extra?.googleWebClientId ||
+    '320828184820-hc6icevuphfocj9cisjes242jijuto25.apps.googleusercontent.com'
+  );
+};
+
 // Configure Google Sign-In once when app starts
 export const initializeGoogleSignIn = () => {
+  const webClientId = getGoogleWebClientId();
+  console.log('🔧 Configuring Google Sign-In with webClientId:', webClientId ? 'FOUND' : 'MISSING');
   GoogleSignin.configure({
-    webClientId: process.env.GOOGLE_WEB_CLIENT_ID, // Replace with your actual Web Client ID
+    webClientId,
     offlineAccess: false,
   });
 };
@@ -19,21 +32,21 @@ export const handleGoogleSignIn = async () => {
     // Sign in with Google
     const signInResult = await GoogleSignin.signIn();
     
-    // Check if user cancelled (signInResult is null/undefined)
-    if (!signInResult) {
-      // User cancelled the sign-in - return silently
+    // Check if user cancelled (signInResult is null/undefined or type is 'cancelled')
+    if (!signInResult || signInResult.type === 'cancelled') {
+      console.log('ℹ️ Google sign-in cancelled by user');
       return {
         success: false,
         message: 'Sign-in cancelled',
       };
     }
     
-    // Extract idToken from either response format
+    // Extract idToken from either response format (v16 uses data.idToken, older uses idToken)
     const idToken = signInResult?.data?.idToken || signInResult?.idToken;
     
-    // If no idToken found, it's likely a cancellation (user closed the window)
+    // If no idToken found, it's likely a cancellation or error
     if (!idToken) {
-      // User cancelled the sign-in - return silently without showing error
+      console.log('ℹ️ No ID token received from Google sign-in');
       return {
         success: false,
         message: 'Sign-in cancelled',
@@ -49,7 +62,7 @@ export const handleGoogleSignIn = async () => {
     });
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Supabase error with Google ID Token:', error);
       throw error;
     }
 
@@ -57,7 +70,7 @@ export const handleGoogleSignIn = async () => {
       throw new Error('No user data received from Supabase');
     }
 
-    console.log('✅ Successfully signed in:', data.user.email);
+    console.log('✅ Successfully signed in to Supabase:', data.user.email);
     
     // Return success response
     return {
@@ -69,7 +82,6 @@ export const handleGoogleSignIn = async () => {
   } catch (error) {
     // Handle specific error codes first
     if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-      // User cancelled - return silently without error
       console.log('ℹ️ Google sign-in cancelled by user');
       return {
         success: false,
@@ -113,10 +125,15 @@ export const handleGoogleSignIn = async () => {
   }
 };
 
-// Sign out function
+// Sign out function - safely resets both Google client and Supabase session
 export const handleGoogleSignOut = async () => {
   try {
-    await GoogleSignin.signOut();
+    try {
+      await GoogleSignin.signOut();
+    } catch (googleError) {
+      // Non-fatal if user wasn't signed in to Google client
+      console.log('ℹ️ GoogleSignin.signOut notice:', googleError?.message);
+    }
     await supabase.auth.signOut();
     console.log('✅ Signed out successfully');
     return { success: true };

@@ -4,6 +4,7 @@ import {
   MaterialIcons,
 } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useContext, useMemo } from "react";
 import {
   ScrollView,
@@ -67,7 +68,15 @@ const GoalSummaryScreen = ({ navigation }) => {
 
   const goalProgress = 0;
 
-  const handleFinishOnboarding = () => {
+  const handleFinishOnboarding = async () => {
+    try {
+      if (onboardingData && Object.keys(onboardingData).length > 0) {
+        await AsyncStorage.setItem("calora_onboarding_data", JSON.stringify(onboardingData));
+        console.log("✅ Onboarding data safely stored before navigation to Signup");
+      }
+    } catch (e) {
+      console.warn("Error persisting onboardingData in GoalSummaryScreen:", e);
+    }
     navigation.replace("Signup");
   };
 

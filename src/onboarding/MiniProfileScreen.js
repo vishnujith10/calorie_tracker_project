@@ -219,6 +219,9 @@ const MiniProfileScreen = () => {
   }
 
   const handleContinue = async () => {
+    const normalizedWeight = isMetric ? weightKg : (Number(weightLbs) / 2.20462).toFixed(1);
+    const normalizedHeight = isMetric ? heightCm : (Number(heightFt) * 30.48).toFixed(1);
+
     setOnboardingData({
       name,
       age,
@@ -227,6 +230,10 @@ const MiniProfileScreen = () => {
       heightFt,
       weightKg,
       weightLbs,
+      weight: normalizedWeight,
+      height: normalizedHeight,
+      selectedWeightUnit: isMetric ? "kg" : "lbs",
+      selectedHeightUnit: isMetric ? "cm" : "ft",
       isMetric,
       bmi,
       googleId: isGoogleUser ? global.googleUserData?.id : null,

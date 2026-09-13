@@ -1,4 +1,5 @@
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useContext, useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ import { OnboardingContext } from '../context/OnboardingContext';
 import { useTheme } from '../context/ThemeContext';
 import supabase from '../lib/supabase';
 import calculateCalorieProfile from '../utils/calorieCalculator';
+import saveUserProfile from '../utils/saveUserProfile';
 import { handleGoogleSignIn, initializeGoogleSignIn } from './googleSignInService';
 
 const CARD_BG = '#FFFFFF';
@@ -176,69 +178,10 @@ const SignupScreen = ({ navigation }) => {
         
         console.log('Successfully signed in, session established for profile creation');
 
-        // ✅ Create profile with onboarding data
-        const userProfile = {
-          id: data.user.id,
-          email: email,
-          name: onboardingData?.name || 'User',
-          age: onboardingData?.age ? Number(onboardingData.age) : null,
-          gender: onboardingData?.gender || null,
-          height: onboardingData?.heightCm ? parseFloat(onboardingData.heightCm) : null,
-          weight: onboardingData?.weightKg ? parseFloat(onboardingData.weightKg) : null,
-          social_refference: onboardingData?.social_refference || null,
-          daily_activity_level: onboardingData?.daily_activity_level || 'moderate',
-          goal_focus: onboardingData?.goal_focus || 'general_fitness',
-          target_weight: onboardingData?.target_weight ? parseFloat(onboardingData.target_weight) : null,
-          weekly_target: onboardingData?.weekly_target || null,
-          spending_time: onboardingData?.spending_time || null,
-          prefered_workout: onboardingData?.prefered_workout || null,
-          total_days_per_week: onboardingData?.total_days_per_week ? Number(onboardingData.total_days_per_week) : 3,
-          prefered_time: onboardingData?.prefered_time || null,
-          weight_unit: onboardingData?.isMetric ? 'kg' : 'lbs',
-          height_unit: onboardingData?.isMetric ? 'cm' : 'ft',
-        };
+        const saved = await saveUserProfile(data.user.id, email, onboardingData?.name, onboardingData);
 
-        console.log('Attempting to insert profile for user:', data.user.id);
-        
-        const { error: profileError } = await supabase
-          .from('user_profile')
-          .upsert(userProfile);
-
-        if (profileError) {
-          console.error('Profile insert error:', profileError);
-          Alert.alert('Warning', 'Account created but failed to save profile. Please contact support.');
-        } else {
-          // ✅ Calculate calorie profile if we have enough data
-          if (onboardingData?.age && onboardingData?.gender && onboardingData?.weightKg && onboardingData?.heightCm) {
-            try {
-              const calorieData = calculateCalorieProfile({
-                age: Number(onboardingData.age),
-                gender: (onboardingData.gender || '').toLowerCase(),
-                weight_kg: Number(onboardingData.weightKg),
-                height_cm: Number(onboardingData.heightCm),
-                activity_level: (onboardingData.daily_activity_level || 'moderate').toLowerCase(),
-                goal_type: (onboardingData.goal_focus || 'maintain').toLowerCase().includes('lose') ? 'lose' : (onboardingData.goal_focus || 'maintain').toLowerCase().includes('gain') ? 'gain' : 'maintain',
-              });
-              
-              await supabase.from('user_profile').update({
-                bmr: calorieData.bmr,
-                tdee: calorieData.tdee,
-                calorie_goal: calorieData.calorie_goal,
-                protein_g: calorieData.macro_targets.protein_g,
-                fat_g: calorieData.macro_targets.fat_g,
-                carbs_g: calorieData.macro_targets.carbs_g,
-              }).eq('id', data.user.id);
-              
-              console.log('✅ Calorie profile created successfully');
-            } catch (calorieError) {
-              console.error('Calorie calculation error:', calorieError);
-            }
-          }
-        }
-
-        // ✅ Reset onboarding data and navigate to main dashboard
-        setOnboardingData({});
-        // ✅ Clear global Google data
+        // Update context with full profile for MainDashboard
+        setOnboardingData(prev => ({ ...prev, ...saved }));
         global.googleUserData = null;
         
         navigation.reset({
@@ -257,94 +200,35 @@ const SignupScreen = ({ navigation }) => {
   // ✅ Google Sign-Up handler with onboarding data
   const onGoogleSignUpPress = async () => {
     setLoading(true);
-    const result = await handleGoogleSignIn();
-    
-    if (result.success) {
-      console.log('✅ Google Sign-In successful for signup');
+    try {
+      const result = await handleGoogleSignIn();
       
-      const { data: profile } = await supabase
-        .from('user_profile')
-        .select('*')
-        .eq('id', result.user.id)
-        .single();
-
-      if (!profile) {
-        console.log('Google OAuth: Creating profile for user:', result.user.id);
+      if (result.success) {
+        console.log('✅ Google Sign-In successful for signup');
         
-        // ✅ Use onboarding data + Google data
-        const userProfile = {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.user_metadata?.full_name || result.user.email?.split('@')[0] || 'User',
-          age: onboardingData?.age ? Number(onboardingData.age) : null,
-          gender: onboardingData?.gender || null,
-          height: onboardingData?.heightCm ? parseFloat(onboardingData.heightCm) : null,
-          weight: onboardingData?.weightKg ? parseFloat(onboardingData.weightKg) : null,
-          social_refference: onboardingData?.social_refference || null,
-          daily_activity_level: onboardingData?.daily_activity_level || 'moderate',
-          goal_focus: onboardingData?.goal_focus || 'general_fitness',
-          target_weight: onboardingData?.target_weight ? parseFloat(onboardingData.target_weight) : null,
-          weekly_target: onboardingData?.weekly_target || null,
-          spending_time: onboardingData?.spending_time || null,
-          prefered_workout: onboardingData?.prefered_workout || null,
-          total_days_per_week: onboardingData?.total_days_per_week ? Number(onboardingData.total_days_per_week) : 3,
-          prefered_time: onboardingData?.prefered_time || null,
-          weight_unit: onboardingData?.isMetric ? 'kg' : 'lbs',
-          height_unit: onboardingData?.isMetric ? 'cm' : 'ft',
-        };
+        const displayName = result.user.user_metadata?.full_name || result.user.email?.split('@')[0] || 'User';
+        const saved = await saveUserProfile(result.user.id, result.user.email, displayName, onboardingData);
         
-        const { error: insertError } = await supabase
-          .from('user_profile')
-          .upsert(userProfile);
+        // Update context with full profile for MainDashboard
+        setOnboardingData(prev => ({ ...prev, ...saved }));
+        // Clear global Google data
+        global.googleUserData = null;
         
-        if (insertError) {
-          console.error('Google OAuth: Profile creation error:', insertError);
-          Alert.alert('Warning', 'Account created but failed to save profile. You can update it later.');
-        } else {
-          // ✅ Calculate calorie profile if we have enough data
-          if (onboardingData?.age && onboardingData?.gender && onboardingData?.weightKg && onboardingData?.heightCm) {
-            try {
-              const calorieData = calculateCalorieProfile({
-                age: Number(onboardingData.age),
-                gender: (onboardingData.gender || '').toLowerCase(),
-                weight_kg: Number(onboardingData.weightKg),
-                height_cm: Number(onboardingData.heightCm),
-                activity_level: (onboardingData.daily_activity_level || 'moderate').toLowerCase(),
-                goal_type: (onboardingData.goal_focus || 'maintain').toLowerCase().includes('lose') ? 'lose' : (onboardingData.goal_focus || 'maintain').toLowerCase().includes('gain') ? 'gain' : 'maintain',
-              });
-              
-              await supabase.from('user_profile').update({
-                bmr: calorieData.bmr,
-                tdee: calorieData.tdee,
-                calorie_goal: calorieData.calorie_goal,
-                protein_g: calorieData.macro_targets.protein_g,
-                fat_g: calorieData.macro_targets.fat_g,
-                carbs_g: calorieData.macro_targets.carbs_g,
-              }).eq('id', result.user.id);
-              
-              console.log('✅ Calorie profile created for Google user');
-            } catch (calorieError) {
-              console.error('Calorie calculation error:', calorieError);
-            }
-          }
+        setLoading(false);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainDashboard' }],
+        });
+      } else {
+        setLoading(false);
+        if (result.message !== 'Sign-in cancelled') {
+          Alert.alert('Error', result.message);
         }
       }
-      
-      // ✅ Reset onboarding data and navigate
-      setOnboardingData({});
-      // ✅ Clear global Google data
-      global.googleUserData = null;
-      
+    } catch (err) {
+      console.error('Google signup error:', err);
       setLoading(false);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainDashboard' }],
-      });
-    } else {
-      setLoading(false);
-      if (result.message !== 'Sign-in cancelled') {
-        Alert.alert('Error', result.message);
-      }
+      Alert.alert('Error', err.message || 'Failed to complete Google signup');
     }
   };
 

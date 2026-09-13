@@ -397,34 +397,32 @@ const MainDashboardScreen = ({ route }) => {
       if (session?.user?.id) {
         const { data: profile } = await supabase
           .from("user_profile")
-          .select("name, weight, target_weight")
+          .select("*")
           .eq("id", session.user.id)
-          .single();
+          .maybeSingle();
 
         if (profile) {
           setOnboardingData((prev) => ({
             ...prev,
+            ...profile,
             name: profile.name || prev.name,
             weight: profile.weight || prev.weight,
             target_weight: profile.target_weight || prev.target_weight,
+            age: profile.age || prev.age,
+            height: profile.height || prev.height,
+            gender: profile.gender || prev.gender,
+            daily_activity_level: profile.daily_activity_level || prev.daily_activity_level,
+            goal_focus: profile.goal_focus || prev.goal_focus,
+            calorie_goal: profile.calorie_goal || prev.calorie_goal,
+            selectedWeightUnit: profile.weight_unit || prev.selectedWeightUnit || "kg",
+            selectedHeightUnit: profile.height_unit || prev.selectedHeightUnit || "cm",
           }));
         }
       }
     };
 
-    if (
-      !onboardingData?.name ||
-      !onboardingData?.weight ||
-      !onboardingData?.target_weight
-    ) {
-      fetchUserProfile();
-    }
-  }, [
-    onboardingData?.name,
-    onboardingData?.weight,
-    onboardingData?.target_weight,
-    setOnboardingData,
-  ]);
+    fetchUserProfile();
+  }, [realUserId]);
 
   const age = Number(onboardingData?.age) || 25;
   const gender = (onboardingData?.gender || "female").toLowerCase();
@@ -438,9 +436,9 @@ const MainDashboardScreen = ({ route }) => {
   else if (goal_type.includes("gain")) goal_type = "gain";
   else goal_type = "maintain";
 
-  const bmr = calculateBMR(gender, weight_kg, height_cm, age);
-  const tdee = calculateTDEE(bmr, activity_level);
-  let calorie_goal = adjustForGoal(tdee, goal_type);
+  const bmr = onboardingData?.bmr || calculateBMR(gender, weight_kg, height_cm, age);
+  const tdee = onboardingData?.tdee || calculateTDEE(bmr, activity_level);
+  let calorie_goal = onboardingData?.calorie_goal || adjustForGoal(tdee, goal_type);
   const minCalories = getMinCalories(gender);
   if (calorie_goal < minCalories) calorie_goal = minCalories;
   calorie_goal = Math.round(calorie_goal);

@@ -58,6 +58,10 @@ export default {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY,
+      googleWebClientId:
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+        process.env.GOOGLE_WEB_CLIENT_ID ||
+        "320828184820-hc6icevuphfocj9cisjes242jijuto25.apps.googleusercontent.com",
     },
     plugins: [
       [

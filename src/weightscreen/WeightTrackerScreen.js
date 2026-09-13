@@ -137,7 +137,7 @@ const WeightTrackerScreen = ({ navigation }) => {
               .from("user_profile")
               .select("weight, target_weight, weight_unit")
               .eq("id", realUserId)
-              .single(),
+              .maybeSingle(),
             supabase
               .from("weight_logs")
               .select("*")

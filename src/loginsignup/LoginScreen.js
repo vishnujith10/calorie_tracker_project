@@ -2,7 +2,8 @@ import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { makeRedirectUri } from 'expo-auth-session';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,8 +16,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { OnboardingContext } from '../context/OnboardingContext';
 import { useTheme } from '../context/ThemeContext';
 import supabase from '../lib/supabase';
+import saveUserProfile from '../utils/saveUserProfile';
 import { handleGoogleSignIn, handleGoogleSignOut, initializeGoogleSignIn } from './googleSignInService';
 
 const useProxy = true;
@@ -52,22 +55,8 @@ const LoginScreen = ({ navigation }) => {
     return emailRegex.test(email);
   };
 
-  // Track if we're handling Google sign-in to prevent duplicate navigation
+  const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
   const isGoogleSignInRef = React.useRef(false);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only navigate if it's NOT a Google sign-in (Google sign-in handles its own navigation)
-      // Also check if email is empty (meaning it's not a regular email/password login)
-      if (event === 'SIGNED_IN' && session && !email && !isGoogleSignInRef.current) {
-        navigation.replace('MainDashboard');
-      }
-      // Don't reset the flag here - let the Google sign-in handler reset it after navigation
-    });
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [email, navigation]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -108,10 +97,9 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
-  // ✅ UPDATED: Google Sign-In with reset to prevent back button
+  // ✅ UPDATED: Google Sign-In with full onboarding validation & save
   const onGoogleSignInPress = async () => {
     setLoading(true);
-    // Set flag to prevent onAuthStateChange from navigating
     isGoogleSignInRef.current = true;
     
     try {
@@ -124,74 +112,107 @@ const LoginScreen = ({ navigation }) => {
       
       if (!result.success) {
         setLoading(false);
-        isGoogleSignInRef.current = false; // Reset flag on failure
+        isGoogleSignInRef.current = false;
         
-        // Handle cancellation silently - user just pressed back, no error needed
+        // Handle cancellation silently - user pressed back
         if (result.message === 'Sign-in cancelled' || result.message?.includes('cancelled')) {
           console.log('ℹ️ Google sign-in cancelled by user');
-          return; // Silently return, no error shown
+          return;
         }
         
-        // Show alert for other errors
         Alert.alert('Error', result.message || 'Failed to sign in with Google');
         return;
       }
 
-      console.log('✅ Google Sign-In successful');
-      console.log('User ID:', result.user.id);
+      console.log('✅ Google Sign-In successful for LoginScreen, User ID:', result.user.id);
       
+      // Check if user has an existing registered profile
       const { data: profile } = await supabase
         .from('user_profile')
-        .select('id, name, age')
+        .select('id, name, age, weight')
         .eq('id', result.user.id)
-        .single();
+        .maybeSingle();
 
-      console.log('Profile check - exists:', !!profile);
-
-      setLoading(false);
-
-      // ✅ EXISTING USER - Go to MainDashboard
-      if (profile && profile.name && profile.age) {
-        console.log('✅ EXISTING USER - Going to MainDashboard');
-        // Small delay to ensure auth state change is processed first
-        setTimeout(() => {
-        navigation.replace('MainDashboard');
-          // Reset flag after navigation
-          setTimeout(() => {
-            isGoogleSignInRef.current = false;
-          }, 500);
-        }, 100);
-      } 
-      // ✅ NEW USER - Use reset to prevent back navigation
-      else {
-        console.log('⚠️ NEW USER - Starting onboarding (no back button)');
-        
-        global.googleUserData = result.user;
-        
-        // ✅ Use reset to clear navigation stack
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MiniProfile' }],
-        });
-        // Reset flag after navigation
-        setTimeout(() => {
-          isGoogleSignInRef.current = false;
-        }, 500);
+      let existingProfile = profile;
+      if (!existingProfile && result.user.email) {
+        const { data: profileByEmail } = await supabase
+          .from('user_profile')
+          .select('id, name, age, weight')
+          .eq('email', result.user.email)
+          .maybeSingle();
+        if (profileByEmail) {
+          existingProfile = profileByEmail;
+        }
       }
+
+      console.log('Profile check - age:', existingProfile?.age, 'weight:', existingProfile?.weight);
+
+      // ✅ CASE 1: ALREADY FULLY REGISTERED USER
+      if (existingProfile && existingProfile.name && existingProfile.age && existingProfile.weight) {
+        console.log('✅ EXISTING REGISTERED USER - Going to MainDashboard');
+        setLoading(false);
+        navigation.replace('MainDashboard');
+        isGoogleSignInRef.current = false;
+        return;
+      }
+
+      // ✅ CASE 2: USER JUST COMPLETED ONBOARDING AND TAPPED GOOGLE LOGIN
+      // Check if there is valid pending onboarding data in memory or storage
+      let pendingData = { ...(onboardingData || {}) };
+      try {
+        const storedStr = await AsyncStorage.getItem('calora_onboarding_data');
+        if (storedStr) {
+          pendingData = { ...JSON.parse(storedStr), ...pendingData };
+        }
+      } catch (e) {
+        console.warn('Error reading stored onboarding data:', e);
+      }
+
+      const hasOnboardingDetails = 
+        (pendingData.age || pendingData.parsedAge) &&
+        (pendingData.weight || pendingData.weightKg || pendingData.weightLbs);
+
+      if (hasOnboardingDetails) {
+        console.log('✅ Pending onboarding data found! Saving profile for new Google user...');
+        const displayName = result.user.user_metadata?.full_name || result.user.email?.split('@')[0] || 'User';
+        const saved = await saveUserProfile(result.user.id, result.user.email, displayName, pendingData);
+        
+        // Populate context with saved profile for MainDashboard
+        setOnboardingData(prev => ({ ...prev, ...saved }));
+
+        setLoading(false);
+        isGoogleSignInRef.current = false;
+        navigation.replace('MainDashboard');
+        return;
+      }
+
+      // ⚠️ CASE 3: UNREGISTERED USER WITH NO ONBOARDING DATA
+      console.log('⚠️ UNREGISTERED USER - Signing out and showing registration prompt');
+      await handleGoogleSignOut();
+      setLoading(false);
+      isGoogleSignInRef.current = false;
+
+      Alert.alert(
+        'Account Not Registered',
+        'This Google account is not registered. Please complete onboarding and register first.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Get Started',
+            onPress: () => {
+              navigation.navigate('MiniProfile');
+            },
+          },
+        ]
+      );
     } catch (error) {
       console.error('Google Sign-In error:', error);
       setLoading(false);
-      isGoogleSignInRef.current = false; // Reset flag on error
-      
-      // Check if error is a cancellation
-      const errorMessage = error?.message || error?.toString() || '';
-      if (errorMessage.includes('cancelled') || errorMessage.includes('cancel')) {
-        console.log('ℹ️ Google sign-in cancelled by user');
-        return; // Silently return, no error shown
-      }
-      
-      // Show alert for actual errors
-      Alert.alert('Error', errorMessage || 'Failed to sign in with Google');
+      isGoogleSignInRef.current = false;
+      Alert.alert('Error', error.message || 'An unexpected error occurred during Google Sign-In');
     }
   };
 
