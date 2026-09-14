@@ -55,7 +55,247 @@ const createPalette = (isDark) => ({
   positiveSoft: isDark ? "#1D403B" : "#E6F5F1",
   selectedCard: isDark ? "#1D403B" : "#E6F5F1",
   nutritionSoft: isDark ? "#1E3B37" : "#EDF7F5",
+  heroChip: isDark ? "#234440" : "#E9F5F2",
+  heroChipBorder: isDark ? "#345A55" : "#D2E7E2",
+  warningBackground: isDark ? "rgba(217,119,6,0.18)" : "#FDF3E7",
+  warningBorder: "#D97706",
 });
+
+// Generate context-aware, empathetic AI weight insights and pace guidance
+const generateWeightInsights = ({
+  logs,
+  currentWeight,
+  goalWeight,
+  userProfile,
+  onboardingData,
+  weightUnit,
+}) => {
+  const insights = [];
+  if (!currentWeight && (!logs || logs.length === 0)) return insights;
+
+  // 1. Determine goal direction
+  const rawGoal = (
+    userProfile?.goal_focus ||
+    onboardingData?.goal_focus ||
+    ""
+  ).toLowerCase();
+
+  let goalType = "maintain";
+  if (rawGoal.includes("lose")) {
+    goalType = "lose";
+  } else if (
+    rawGoal.includes("gain") ||
+    rawGoal.includes("bulk") ||
+    rawGoal.includes("build")
+  ) {
+    goalType = "gain";
+  } else if (goalWeight && currentWeight) {
+    const diff = Number(goalWeight) - Number(currentWeight);
+    if (diff < -0.5) goalType = "lose";
+    else if (diff > 0.5) goalType = "gain";
+    else goalType = "maintain";
+  }
+
+  // 2. Determine rate/speed of change per week
+  let weeklySpeed = 0;
+  let hasWeeklyRate = false;
+
+  if (logs && logs.length > 1) {
+    const today = new Date(logs[0].date);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+
+    let historicalLog = logs[logs.length - 1];
+    let minDiff = Infinity;
+
+    for (let i = 1; i < logs.length; i++) {
+      const diff = Math.abs(new Date(logs[i].date) - weekAgo);
+      if (diff < minDiff) {
+        minDiff = diff;
+        historicalLog = logs[i];
+      }
+    }
+
+    const daysDiff = Math.max(
+      1,
+      Math.abs(new Date(logs[0].date) - new Date(historicalLog.date)) /
+        (1000 * 60 * 60 * 24),
+    );
+
+    const wCurrent = Number(logs[0].weight);
+    const wHistorical = Number(historicalLog.weight);
+    const totalChangeKg = wCurrent - wHistorical;
+    const weeklyRateKg = (totalChangeKg / daysDiff) * 7;
+
+    weeklySpeed =
+      weightUnit === "lbs"
+        ? Number((weeklyRateKg * 2.20462).toFixed(1))
+        : Number(weeklyRateKg.toFixed(1));
+    hasWeeklyRate = true;
+  } else if (
+    logs &&
+    logs.length === 1 &&
+    (onboardingData?.weight || userProfile?.weight)
+  ) {
+    const startWeight = Number(userProfile?.weight || onboardingData?.weight);
+    const wCurrent = Number(logs[0].weight);
+    const diffKg = wCurrent - startWeight;
+    weeklySpeed =
+      weightUnit === "lbs"
+        ? Number((diffKg * 2.20462).toFixed(1))
+        : Number(diffKg.toFixed(1));
+    hasWeeklyRate = Math.abs(weeklySpeed) > 0.05;
+  }
+
+  const absSpeed = Math.abs(weeklySpeed).toFixed(1);
+
+  // 3. Goal-specific pace analysis & supportive psychology
+  if (goalType === "lose") {
+    if (!hasWeeklyRate) {
+      insights.push({
+        title: "Starting Your Transformation",
+        icon: "🌱",
+        message:
+          "Welcome to your journey! The first few check-ins establish your true baseline. We'll evaluate your weekly speed as you keep logging.",
+        action: "Weigh in under consistent morning conditions for best results",
+        priority: "low",
+      });
+    } else if (weeklySpeed <= -0.3 && weeklySpeed >= -1.0) {
+      // Optimal healthy loss pace (~0.3 to 1.0 kg/week)
+      insights.push({
+        title: "Steady & Sustainable Pace",
+        icon: "🌟",
+        message: `You're shedding weight at a healthy, consistent pace of ~${absSpeed} ${weightUnit}/week. This controlled speed protects your metabolism, preserves lean muscle, and ensures lasting fat loss.`,
+        action: "Keep up your balanced routine and daily consistency!",
+        priority: "low",
+      });
+    } else if (weeklySpeed < -1.0) {
+      // Rapid loss pace
+      insights.push({
+        title: "Fast Weight Drop",
+        icon: "⚡",
+        message: `Your weight is dropping quickly (~${absSpeed} ${weightUnit}/week). Early rapid drops often reflect depleted water and glycogen. Make sure you're eating enough calories and protein to sustain your strength.`,
+        action: "Fuel yourself well and stay hydrated to preserve energy",
+        priority: "medium",
+      });
+    } else if (weeklySpeed > -0.3 && weeklySpeed <= 0.8) {
+      // Plateau or normal water fluctuation
+      insights.push({
+        title: "Scale Holding Steady",
+        icon: "🛡️",
+        message: `The scale stayed flat or moved slightly this week (${weeklySpeed > 0 ? "+" : ""}${weeklySpeed} ${weightUnit}). This is completely normal! Muscle repair, sodium, and natural digestion cause temporary water retention that can mask real fat loss.`,
+        action: "Trust the process—the long-term trend will show your hard work",
+        priority: "low",
+      });
+    } else {
+      // Temporary uptick
+      insights.push({
+        title: "Supportive Check-in",
+        icon: "💙",
+        message: `Weight ticked up slightly by ${absSpeed} ${weightUnit}. Remember: scale weight does not equal body fat. Hormones, hydration, and stress fluctuate constantly. Be kind to yourself today.`,
+        action: "Stay consistent with your wholesome meals—one day at a time",
+        priority: "medium",
+      });
+    }
+  } else if (goalType === "gain") {
+    if (!hasWeeklyRate) {
+      insights.push({
+        title: "Building Lean Size",
+        icon: "🌱",
+        message:
+          "Welcome to your muscle building phase! Consistent progressive overload and adequate nutrition are your best friends.",
+        action: "Log your weight 1-2 times weekly to track your caloric surplus",
+        priority: "low",
+      });
+    } else if (weeklySpeed >= 0.2 && weeklySpeed <= 0.5) {
+      // Optimal lean gaining pace
+      insights.push({
+        title: "Optimal Lean Gaining Pace",
+        icon: "💪",
+        message: `You are gaining at an ideal rate of ~${absSpeed} ${weightUnit}/week. This measured pace maximizes muscle tissue growth while keeping unnecessary body fat accumulation low.`,
+        action: "Keep nailing your training intensity and protein targets!",
+        priority: "low",
+      });
+    } else if (weeklySpeed > 0.5) {
+      // Fast gain
+      insights.push({
+        title: "Rapid Weight Increase",
+        icon: "📈",
+        message: `Your weight climbed quickly by ~${absSpeed} ${weightUnit}/week. Extra carbs naturally retain intra-muscular water. Keep an eye on your surplus to ensure gains remain lean and dense.`,
+        action: "Channel those extra calories into progressive overload in your lifts",
+        priority: "medium",
+      });
+    } else {
+      // Stagnant or dropping
+      insights.push({
+        title: "High Energy Expenditure",
+        icon: "🔥",
+        message: `Your weight hasn't moved up yet this week (${weeklySpeed} ${weightUnit}). Your metabolism might be running fast, or daily activity is high. Packing on size takes consistent extra fuel.`,
+        action:
+          "Try adding a nutrient-dense 200 kcal snack (nuts, yogurt, or peanut butter)",
+        priority: "medium",
+      });
+    }
+  } else {
+    // Maintenance
+    if (Math.abs(weeklySpeed) <= 0.5) {
+      insights.push({
+        title: "In Beautiful Balance",
+        icon: "⚖️",
+        message: `Your weight is holding comfortably in your target equilibrium zone (change of ~${absSpeed} ${weightUnit}). Maintaining weight demonstrates fantastic lifestyle balance.`,
+        action: "Celebrate your stability—maintenance is a major skill!",
+        priority: "low",
+      });
+    } else {
+      insights.push({
+        title: "Natural Rhythm Check",
+        icon: "🧭",
+        message: `A slight shift of ${absSpeed} ${weightUnit} occurred this week. Normal fluid retention and carb consumption shift weight easily without meaning anything is off track.`,
+        action: "Listen to natural hunger cues and keep tracking mindfully",
+        priority: "low",
+      });
+    }
+  }
+
+  // 4. Milestone / Encouragement
+  if (goalWeight && currentWeight) {
+    const currentNum =
+      weightUnit === "lbs" ? currentWeight * 2.20462 : currentWeight;
+    const goalNum =
+      weightUnit === "lbs" ? Number(goalWeight) * 2.20462 : Number(goalWeight);
+    const remainingDiff = Math.abs(currentNum - goalNum).toFixed(1);
+
+    if (Number(remainingDiff) < 0.5) {
+      insights.push({
+        title: "Goal Destination Reached! 🏆",
+        icon: "🎉",
+        message: `You are essentially at your target weight (${goalNum.toFixed(1)} ${weightUnit})! What an extraordinary accomplishment.`,
+        action: "Take pride in your dedication and healthy habits!",
+        priority: "low",
+      });
+    } else {
+      insights.push({
+        title: "Eyes on the Goal",
+        icon: "🎯",
+        message: `You are ${remainingDiff} ${weightUnit} away from your target of ${goalNum.toFixed(1)} ${weightUnit}. Every healthy choice brings you closer.`,
+        action: "Focus on today's healthy choices—the results follow",
+        priority: "low",
+      });
+    }
+  }
+
+  // 5. Supportive Mindset & Body Science
+  insights.push({
+    title: "Body Science Reassurance",
+    icon: "💡",
+    message:
+      "Muscle repair after hard training holds up to 1-2 kg of temporary water for 48-72 hours. An unexpected scale jump often simply means your body is repairing and getting stronger!",
+    action: "Measure your success by your energy, sleep, and mood",
+    priority: "low",
+  });
+
+  return insights.slice(0, 3);
+};
 
 const WeightTrackerScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
@@ -86,6 +326,8 @@ const WeightTrackerScreen = ({ navigation }) => {
   const [goalWeight, setGoalWeight] = useState(
     () => globalWeightCache.cachedData?.userProfile?.target_weight || null,
   );
+  const [weightInsights, setWeightInsights] = useState([]);
+  const [activeInsightIndex, setActiveInsightIndex] = useState(0);
   const [realUserId, setRealUserId] = useState(null);
 
   // Get user ID on mount
@@ -135,7 +377,7 @@ const WeightTrackerScreen = ({ navigation }) => {
           ] = await Promise.all([
             supabase
               .from("user_profile")
-              .select("weight, target_weight, weight_unit")
+              .select("weight, target_weight, weight_unit, goal_focus, weekly_target")
               .eq("id", realUserId)
               .maybeSingle(),
             supabase
@@ -154,6 +396,8 @@ const WeightTrackerScreen = ({ navigation }) => {
               target_weight: profile.target_weight || prev.target_weight,
               selectedWeightUnit:
                 profile.weight_unit || prev.selectedWeightUnit || "kg",
+              goal_focus: profile.goal_focus || prev.goal_focus,
+              weekly_target: profile.weekly_target || prev.weekly_target,
             }));
           }
 
@@ -219,6 +463,19 @@ const WeightTrackerScreen = ({ navigation }) => {
   // Weight Logic matching Dashboard display
   const weightUnit =
     userProfile?.weight_unit || onboardingData?.selectedWeightUnit || "kg";
+
+  // Re-generate supportive weight insights dynamically
+  useEffect(() => {
+    const insights = generateWeightInsights({
+      logs,
+      currentWeight,
+      goalWeight,
+      userProfile,
+      onboardingData,
+      weightUnit,
+    });
+    setWeightInsights(insights);
+  }, [logs, currentWeight, goalWeight, userProfile, onboardingData, weightUnit]);
 
   // Display value for current weight (with unit conversion if necessary)
   const displayWeight =
@@ -563,6 +820,85 @@ const WeightTrackerScreen = ({ navigation }) => {
           />
         </View>
       </View>
+
+      {/* AI Weight Insights & Recommendations - Show one insight at a time */}
+      {weightInsights.length > 0 && (
+        <View style={styles.insightsCard}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionIconShell}>
+                <Text style={{ fontSize: 16 }}>💡</Text>
+              </View>
+              <View>
+                <Text style={styles.sectionEyebrow}>Support & Progress</Text>
+                <Text style={styles.sectionTitle}>Weight Insight</Text>
+              </View>
+            </View>
+
+            {weightInsights.length > 1 && (
+              <View style={styles.insightNavRow}>
+                <TouchableOpacity
+                  onPress={() =>
+                    setActiveInsightIndex((prev) =>
+                      prev === 0 ? weightInsights.length - 1 : prev - 1,
+                    )
+                  }
+                  style={styles.insightNavBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={16}
+                    color={palette.primary}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.insightNavCount}>
+                  {(activeInsightIndex % weightInsights.length) + 1}/
+                  {weightInsights.length}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    setActiveInsightIndex(
+                      (prev) => (prev + 1) % weightInsights.length,
+                    )
+                  }
+                  style={styles.insightNavBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={palette.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {(() => {
+            const insight =
+              weightInsights[activeInsightIndex % weightInsights.length];
+            if (!insight) return null;
+            return (
+              <View
+                style={[
+                  styles.insightItem,
+                  insight.priority === "high" && styles.highPriorityInsight,
+                ]}
+              >
+                <Text style={styles.insightIcon}>{insight.icon}</Text>
+                <View style={styles.insightContent}>
+                  <Text style={styles.insightTitle}>{insight.title}</Text>
+                  <Text style={styles.insightMessage}>{insight.message}</Text>
+                  {insight.action ? (
+                    <Text style={styles.insightAction}>{insight.action}</Text>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })()}
+        </View>
+      )}
 
       <View style={styles.historyHeaderRow}>
         <Text style={styles.sectionEyebrow}>History</Text>
@@ -952,6 +1288,95 @@ const createStyles = (palette) =>
       color: palette.textSecondary,
       textAlign: "center",
       lineHeight: 20,
+    },
+
+    // Weight Insights Card
+    insightsCard: {
+      backgroundColor: palette.card,
+      borderRadius: 30,
+      padding: 18,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
+      elevation: 4,
+    },
+    sectionHeaderLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    sectionIconShell: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: palette.heroChip,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.heroChipBorder,
+    },
+    insightItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      backgroundColor: palette.nutritionSoft,
+      borderRadius: 18,
+      padding: 14,
+      marginBottom: 0,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    insightNavRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 14,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: palette.border,
+      gap: 6,
+    },
+    insightNavBtn: {
+      padding: 2,
+    },
+    insightNavCount: {
+      fontSize: 12,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
+    },
+    highPriorityInsight: {
+      backgroundColor: palette.warningBackground,
+      borderColor: palette.warningBorder,
+    },
+    insightIcon: {
+      fontSize: 22,
+      marginRight: 12,
+      marginTop: 2,
+    },
+    insightContent: {
+      flex: 1,
+    },
+    insightTitle: {
+      fontSize: 14.5,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.textPrimary,
+      marginBottom: 3,
+    },
+    insightMessage: {
+      fontSize: 13,
+      fontFamily: "Manrope-Regular",
+      color: palette.textSecondary,
+      marginBottom: 6,
+      lineHeight: 19,
+    },
+    insightAction: {
+      fontSize: 12.5,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.primary,
     },
 
     // Add button

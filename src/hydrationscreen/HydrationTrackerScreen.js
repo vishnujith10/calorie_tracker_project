@@ -102,6 +102,7 @@ const HydrationTrackerScreen = () => {
   const [contextualRecommendations, setContextualRecommendations] = useState(
     [],
   );
+  const [activeRecIndex, setActiveRecIndex] = useState(0);
   const [dailyContext, setDailyContext] = useState(null);
 
   const progress = (currentIntake / dailyGoal) * 100;
@@ -223,100 +224,139 @@ const HydrationTrackerScreen = () => {
     setWeeklyIntakeValues(updatedWeeklyIntakeValues);
   };
 
-  // Generate context-aware hydration recommendations
-  const generateHydrationRecommendations = (context, currentIntake, goal) => {
+  // Generate context-aware hydration recommendations with supportive wellness feedback
+  const generateHydrationRecommendations = (context, currentIntake, goal, weeklyData) => {
     const recommendations = [];
-    const progress = (currentIntake / goal) * 100;
+    const targetGoal = goal > 0 ? goal : 2.5;
+    const progress = Math.min(100, Math.round((currentIntake / targetGoal) * 100));
+    const remaining = Math.max(0, targetGoal - currentIntake).toFixed(1);
+    const currentHour = new Date().getHours();
 
-    // High stress = need more hydration
+    // 1. Goal completion & progress pacing recommendations
+    if (currentIntake >= targetGoal) {
+      recommendations.push({
+        type: "celebration",
+        priority: "low",
+        message: `Amazing job! You've achieved your ${targetGoal}L hydration goal today! 🎉 Your body is primed for optimal energy and recovery.`,
+        action: "Keep sipping mindfully if thirsty",
+        icon: "🎉",
+      });
+    } else if (currentIntake === 0) {
+      if (currentHour < 12) {
+        recommendations.push({
+          type: "morning",
+          priority: "medium",
+          message: "A fresh morning glass of water wakes up your digestive system and kickstarts your daily metabolism after hours of sleep.",
+          action: "Start your day with a full 300–500ml glass",
+          icon: "🌅",
+        });
+      } else if (currentHour < 17) {
+        recommendations.push({
+          type: "kickstart",
+          priority: "high",
+          message: `You haven't logged water yet today. Rehydrating now prevents afternoon fatigue and keeps your focus sharp.`,
+          action: `Grab a glass to start your journey to ${targetGoal}L`,
+          icon: "💧",
+        });
+      } else {
+        recommendations.push({
+          type: "evening",
+          priority: "medium",
+          message: "Even later in the day, consistent sips support your body's overnight cellular repair.",
+          action: "Sip steadily rather than chugging",
+          icon: "🌙",
+        });
+      }
+    } else if (progress < 50) {
+      recommendations.push({
+        type: "progress",
+        priority: "medium",
+        message: `You're at ${progress}% (${currentIntake.toFixed(1)}L). Consistent hydration boosts mental clarity and physical stamina.`,
+        action: `Only ${remaining}L remaining to hit your target—keep going!`,
+        icon: "💧",
+      });
+    } else if (progress < 85) {
+      recommendations.push({
+        type: "progress",
+        priority: "low",
+        message: `Over halfway there at ${progress}%! Your cells and muscles are thanking you for staying ahead of dehydration.`,
+        action: `Just ${remaining}L to reach your daily milestone`,
+        icon: "⚡",
+      });
+    } else {
+      recommendations.push({
+        type: "final_stretch",
+        priority: "low",
+        message: `Almost there! You are at ${progress}% of your daily goal. One or two more glasses will cross the finish line.`,
+        action: `${remaining}L left—you've got this!`,
+        icon: "✨",
+      });
+    }
+
+    // 2. Context-based recommendations (stress, sleep, activity if provided)
     if (
-      context.responses.stress === "High" ||
-      context.responses.stress === "Very High"
+      context?.responses?.stress === "High" ||
+      context?.responses?.stress === "Very High"
     ) {
       recommendations.push({
         type: "stress",
         priority: "high",
-        message: "High stress increases cortisol and dehydration risk.",
-        action: "Add an extra glass of water",
+        message: "High stress increases cortisol and dehydrates cells faster. Hydration helps regulate your nervous system.",
+        action: "Take 3 calm breaths and sip some cool water",
         icon: "🧘‍♀️",
       });
     }
 
-    // Low sleep = need more hydration
-    if (context.responses.sleep < 7) {
+    if (context?.responses?.sleep && context.responses.sleep < 7) {
       recommendations.push({
         type: "sleep",
         priority: "high",
-        message:
-          "Poor sleep affects hydration. Your body needs extra water to recover.",
-        action: "Drink water first thing in the morning",
+        message: "Short sleep alters fluid-regulating hormones. Your body needs a little extra water to recover today.",
+        action: "Add an extra 250ml glass during your day",
         icon: "😴",
       });
     }
 
-    // Low energy = might be dehydration
-    if (
-      context.responses.energy === "Low" ||
-      context.responses.energy === "Very Low"
-    ) {
+    // 3. Smart lifestyle tips based on time of day & wellness
+    if (currentHour >= 20) {
       recommendations.push({
-        type: "energy",
+        type: "night",
+        priority: "low",
+        message: "Evening tip: taper heavy water drinking 1 hour before bed to support uninterrupted, deep sleep.",
+        action: "Small sips only if your mouth feels dry",
+        icon: "🛏️",
+      });
+    } else if (currentHour >= 13 && currentHour <= 16 && progress < 60) {
+      recommendations.push({
+        type: "slump",
         priority: "medium",
-        message: "Low energy can be a sign of dehydration.",
-        action: "Try drinking a glass of water",
+        message: "The afternoon slump is often dehydration in disguise. Water can restore energy faster than caffeine.",
+        action: "Drink a cold glass of water before reaching for coffee",
         icon: "⚡",
       });
-    }
-
-    // Travel situation = need more hydration
-    if (
-      context.responses.situation &&
-      context.responses.situation.includes("Traveling")
-    ) {
+    } else {
       recommendations.push({
-        type: "travel",
-        priority: "high",
-        message: "Traveling increases dehydration risk, especially on flights.",
-        action: "Drink extra water and avoid alcohol",
-        icon: "✈️",
-      });
-    }
-
-    // High activity = need more hydration
-    if (
-      context.responses.situation &&
-      context.responses.situation.includes("Extra active day")
-    ) {
-      recommendations.push({
-        type: "activity",
-        priority: "high",
-        message: "Extra active day! Your body needs more hydration.",
-        action: "Add 500ml extra water",
-        icon: "🏃‍♀️",
-      });
-    }
-
-    // Progress-based recommendations
-    if (progress < 50) {
-      recommendations.push({
-        type: "progress",
-        priority: "medium",
-        message: "You're at " + Math.round(progress) + "% of your goal.",
-        action: "Keep going! You're doing great",
-        icon: "💧",
-      });
-    } else if (progress >= 100) {
-      recommendations.push({
-        type: "celebration",
+        type: "wellness",
         priority: "low",
-        message: "Amazing! You've hit your hydration goal! 🎉",
-        action: "Keep up the great work",
-        icon: "🎉",
+        message: "Did you know? Water cushions your joints and delivers vital nutrients directly to muscle tissue.",
+        action: "Keep your bottle within arm's reach",
+        icon: "🌱",
       });
     }
 
-    return recommendations;
+    return recommendations.slice(0, 3);
   };
+
+  // Keep recommendations updated dynamically
+  useEffect(() => {
+    const recs = generateHydrationRecommendations(
+      dailyContext,
+      currentIntake,
+      dailyGoal,
+      weeklyIntakeData,
+    );
+    setContextualRecommendations(recs);
+  }, [currentIntake, dailyGoal, dailyContext, weeklyIntakeData]);
 
   const initializeUser = async () => {
     try {
@@ -335,8 +375,6 @@ const HydrationTrackerScreen = () => {
 
       // Load the most recent goal from database to use as default
       await loadMostRecentGoal(user.id);
-
-      // Generate context-aware recommendations removed
 
       // Clean up any existing duplicates first
       await cleanupDuplicateRecords(user.id, getCurrentDate());
@@ -1216,38 +1254,90 @@ const HydrationTrackerScreen = () => {
               </View>
             </View>
 
-            {/* Context-Aware Recommendations */}
+            {/* Context-Aware Recommendations - Show one at a time */}
             {contextualRecommendations.length > 0 && (
               <View style={styles.recommendationsCard}>
                 <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionIconShell}>
-                    <Text style={{ fontSize: 16 }}>💡</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.sectionEyebrow}>For you</Text>
-                    <Text style={styles.sectionTitle}>Personalized Tips</Text>
-                  </View>
-                </View>
-                {contextualRecommendations.map((rec, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.recommendationItem,
-                      rec.priority === "high" &&
-                        styles.highPriorityRecommendation,
-                    ]}
-                  >
-                    <Text style={styles.recommendationIcon}>{rec.icon}</Text>
-                    <View style={styles.recommendationContent}>
-                      <Text style={styles.recommendationMessage}>
-                        {rec.message}
-                      </Text>
-                      <Text style={styles.recommendationAction}>
-                        {rec.action}
-                      </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <View style={styles.sectionIconShell}>
+                      <Text style={{ fontSize: 16 }}>💡</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.sectionEyebrow}>For you</Text>
+                      <Text style={styles.sectionTitle}>Personalized Tip</Text>
                     </View>
                   </View>
-                ))}
+
+                  {contextualRecommendations.length > 1 && (
+                    <View style={styles.insightNavRow}>
+                      <TouchableOpacity
+                        onPress={() =>
+                          setActiveRecIndex((prev) =>
+                            prev === 0
+                              ? contextualRecommendations.length - 1
+                              : prev - 1,
+                          )
+                        }
+                        style={styles.insightNavBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Icon
+                          name="chevron-left"
+                          size={16}
+                          color={palette.primary}
+                        />
+                      </TouchableOpacity>
+                      <Text style={styles.insightNavCount}>
+                        {(activeRecIndex % contextualRecommendations.length) + 1}/
+                        {contextualRecommendations.length}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          setActiveRecIndex(
+                            (prev) => (prev + 1) % contextualRecommendations.length,
+                          )
+                        }
+                        style={styles.insightNavBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Icon
+                          name="chevron-right"
+                          size={16}
+                          color={palette.primary}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {(() => {
+                  const rec =
+                    contextualRecommendations[
+                      activeRecIndex % contextualRecommendations.length
+                    ];
+                  if (!rec) return null;
+                  return (
+                    <View
+                      style={[
+                        styles.recommendationItem,
+                        rec.priority === "high" &&
+                          styles.highPriorityRecommendation,
+                      ]}
+                    >
+                      <Text style={styles.recommendationIcon}>{rec.icon}</Text>
+                      <View style={styles.recommendationContent}>
+                        <Text style={styles.recommendationMessage}>
+                          {rec.message}
+                        </Text>
+                        {rec.action ? (
+                          <Text style={styles.recommendationAction}>
+                            {rec.action}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
             )}
 
@@ -1734,9 +1824,28 @@ const createStyles = (palette, isDark) =>
       backgroundColor: palette.recommendationItemBg,
       borderRadius: 18,
       padding: 14,
-      marginBottom: 10,
+      marginBottom: 0,
       borderWidth: 1,
       borderColor: palette.recommendationBorder,
+    },
+    insightNavRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 14,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: palette.border,
+      gap: 6,
+    },
+    insightNavBtn: {
+      padding: 2,
+    },
+    insightNavCount: {
+      fontSize: 12,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
     },
     highPriorityRecommendation: {
       backgroundColor: palette.highPriorityBg,
