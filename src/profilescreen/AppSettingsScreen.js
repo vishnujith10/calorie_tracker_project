@@ -1443,80 +1443,28 @@ const AppSettingsScreen = () => {
             </View>,
           )}
 
-          {renderSection(
-            "shield-checkmark-outline",
-            "Your data",
-            "Privacy & Data",
-            <View>
-              {renderToggleItem(
-                "Anonymous Data Sharing",
-                anonymousDataSharing,
-                setAnonymousDataSharing,
-              )}
-
-              <View style={styles.settingItem}>
-                <View style={styles.settingLeft}>
-                  <Text style={styles.settingLabel}>Data Export</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Last export: 2 days ago
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.exportButton}
-                  onPress={handleDataExport}
-                >
-                  <Text style={styles.exportButtonText}>Export CSV</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.settingItem}>
-                <View style={styles.settingLeft}>
-                  <Text style={styles.settingLabel}>Clear History</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={handleClearHistory}
-                >
-                  <Text style={styles.clearButtonText}>Clear</Text>
-                </TouchableOpacity>
-              </View>
-            </View>,
-          )}
-
-          {renderSection(
-            "options-outline",
-            "App-wide",
-            "General",
-            <View>
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionTitle}>Language</Text>
-                {renderPillGroup(["English", "Español"], language, setLanguage)}
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.logoutButton,
-                  isLoggingOut && styles.logoutButtonDisabled,
-                ]}
-                onPress={handleLogout}
-                disabled={isLoggingOut}
-                activeOpacity={0.85}
-              >
-                {isLoggingOut ? (
-                  <ActivityIndicator size="small" color={palette.error} />
-                ) : (
-                  <Ionicons
-                    name="log-out-outline"
-                    size={19}
-                    color={palette.error}
-                  />
-                )}
-                <Text style={styles.logoutButtonText}>
-                  {isLoggingOut ? "Logging out..." : "Logout"}
-                </Text>
-              </TouchableOpacity>
-            </View>,
-          )}
+          <TouchableOpacity
+            style={[
+              styles.logoutButton,
+              isLoggingOut && styles.logoutButtonDisabled,
+            ]}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+            activeOpacity={0.85}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator size="small" color={palette.error} />
+            ) : (
+              <Ionicons
+                name="log-out-outline"
+                size={19}
+                color={palette.error}
+              />
+            )}
+            <Text style={styles.logoutButtonText}>
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </Text>
+          </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Calora App v2.1.0</Text>
@@ -1805,7 +1753,8 @@ const createStyles = (palette, isDark) =>
 
     /* Logout */
     logoutButton: {
-      marginTop: 6,
+      marginTop: 4,
+      marginBottom: 16,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
