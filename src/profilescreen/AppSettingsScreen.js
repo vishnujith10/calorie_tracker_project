@@ -277,11 +277,12 @@ const AppSettingsScreen = () => {
           hydrationReminderTime: data.hydration_reminder_time,
           sleepReminderTime: data.sleep_reminder_time,
           aiInsights: data.ai_insights ?? true,
-          focusAreas: data.focus_areas || {
+          focusAreas: {
             calories: true,
             sleep: true,
             hydration: true,
             weight: true,
+            ...(data.focus_areas || {}),
           },
           anonymousDataSharing: data.anonymous_data_sharing ?? true,
           language: data.language ?? "English",
