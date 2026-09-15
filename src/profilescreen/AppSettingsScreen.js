@@ -478,10 +478,75 @@ const AppSettingsScreen = () => {
     }, 1000);
   }, []);
 
-  // Load settings on mount (like StepTrackerScreen - no useFocusEffect)
+  // After settings load, ensure OS has notifications registered if toggles are enabled.
+  // This handles cases where OS cleared scheduled notifications (reboot, memory pressure, etc.)
+  const ensureNotificationsScheduled = useCallback(async () => {
+    try {
+      const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+
+      const isScheduled = (title) =>
+        allScheduled.some((n) => n.content.title === title);
+
+      const checks = [
+        {
+          type: "meal",
+          enabled: dailyReminders && mealReminders,
+          time: mealReminderTime,
+          title: "Meal Reminder",
+        },
+        {
+          type: "hydration",
+          enabled: dailyReminders && hydrationReminders,
+          time: hydrationReminderTime,
+          title: "Hydration Reminder",
+        },
+        {
+          type: "sleep",
+          enabled: dailyReminders && sleepReminders,
+          time: sleepReminderTime,
+          title: "Sleep Reminder",
+        },
+      ];
+
+      for (const check of checks) {
+        if (check.enabled && !isScheduled(check.title)) {
+          console.log(
+            `⚠️ ${check.type} notification missing from OS — re-scheduling...`,
+          );
+          await scheduleNotification(check.type, check.time, true);
+        } else if (!check.enabled && isScheduled(check.title)) {
+          // Clean up stale notifications that shouldn't be scheduled
+          await cancelNotification(check.type);
+        }
+      }
+    } catch (error) {
+      console.error("Error ensuring notifications scheduled:", error);
+    }
+  }, [
+    dailyReminders,
+    mealReminders,
+    hydrationReminders,
+    sleepReminders,
+    mealReminderTime,
+    hydrationReminderTime,
+    sleepReminderTime,
+    scheduleNotification,
+    cancelNotification,
+  ]);
+
+  // Load settings on mount and verify OS notifications are in sync
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    const init = async () => {
+      await loadSettings();
+      // Wait for mount flag to be cleared (set to false after 1s),
+      // then verify the OS has the alarms registered and re-schedule if missing
+      setTimeout(async () => {
+        // isInitialMount becomes false after 1s - at 1.5s it should be false
+        await ensureNotificationsScheduled();
+      }, 1800);
+    };
+    init();
+  }, [loadSettings, ensureNotificationsScheduled]);
 
   // Handle hardware back button - go back normally
   useFocusEffect(
@@ -647,8 +712,8 @@ const AppSettingsScreen = () => {
           await cancelNotification(type);
         }
 
-        // Schedule daily recurring notification natively via OS (Android AlarmManager / iOS UNCalendarNotificationTrigger)
-        // This ensures the alarm fires every day even when the app is completely closed or device rebooted
+        // Schedule daily recurring notification natively via OS
+        // repeats: true ensures it fires every day, not just once
         const notificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: expectedTitle,
@@ -662,6 +727,7 @@ const AppSettingsScreen = () => {
             hour: hours,
             minute: minutes,
             channelId: "default",
+            repeats: true,
           },
         });
 
