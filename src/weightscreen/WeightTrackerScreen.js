@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { OnboardingContext } from "../context/OnboardingContext";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
+import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 
 // Global cache for WeightTrackerScreen (Instagram pattern)
 const globalWeightCache = {
@@ -328,6 +329,9 @@ const WeightTrackerScreen = ({ navigation }) => {
   );
   const [weightInsights, setWeightInsights] = useState([]);
   const [activeInsightIndex, setActiveInsightIndex] = useState(0);
+  const [insightsEnabled, setInsightsEnabled] = useState(() =>
+    isInsightEnabledSync("weight"),
+  );
   const [realUserId, setRealUserId] = useState(null);
 
   // Get user ID on mount
@@ -344,6 +348,7 @@ const WeightTrackerScreen = ({ navigation }) => {
   // Fetch user profile and logs with caching
   useFocusEffect(
     React.useCallback(() => {
+      isInsightEnabled("weight").then(setInsightsEnabled);
       if (!realUserId) return;
 
       const load = async () => {
@@ -821,8 +826,8 @@ const WeightTrackerScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* AI Weight Insights & Recommendations - Show one insight at a time */}
-      {weightInsights.length > 0 && (
+      {/* AI Weight Insights & Recommendations - Show one insight at a time if enabled */}
+      {insightsEnabled && weightInsights.length > 0 && (
         <View style={styles.insightsCard}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderLeft}>

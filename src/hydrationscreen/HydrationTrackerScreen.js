@@ -22,6 +22,7 @@ import {
 
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
+import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 
 // Global cache for HydrationTrackerScreen (Instagram pattern)
 const globalHydrationCache = {
@@ -103,10 +104,21 @@ const HydrationTrackerScreen = () => {
     [],
   );
   const [activeRecIndex, setActiveRecIndex] = useState(0);
+  const [insightsEnabled, setInsightsEnabled] = useState(() =>
+    isInsightEnabledSync("hydration"),
+  );
   const [dailyContext, setDailyContext] = useState(null);
 
   const progress = (currentIntake / dailyGoal) * 100;
   const isGoalAchieved = currentIntake >= dailyGoal;
+
+  // Re-check settings whenever screen is focused
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      isInsightEnabled("hydration").then(setInsightsEnabled);
+    });
+    return unsub;
+  }, [navigation]);
 
   // Animated water level (0–100 representing % fill)
   const waterAnim = useRef(new Animated.Value(progress)).current;
@@ -1254,8 +1266,8 @@ const HydrationTrackerScreen = () => {
               </View>
             </View>
 
-            {/* Context-Aware Recommendations - Show one at a time */}
-            {contextualRecommendations.length > 0 && (
+            {/* Context-Aware Recommendations - Show one at a time if enabled */}
+            {insightsEnabled && contextualRecommendations.length > 0 && (
               <View style={styles.recommendationsCard}>
                 <View style={styles.sectionHeaderRow}>
                   <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>

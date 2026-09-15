@@ -27,6 +27,7 @@ import {
 import { OnboardingContext } from "../context/OnboardingContext";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
+import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 
 const SLEEP_QUALITIES = ["Excellent", "Good", "Fair", "Poor"];
 const MOODS = ["Relaxed", "Neutral", "Tired", "Stressed"];
@@ -92,6 +93,9 @@ const SleepTrackerScreen = () => {
   // AI insights and recommendations
   const [sleepInsights, setSleepInsights] = useState([]);
   const [sleepRecommendations, setSleepRecommendations] = useState([]);
+  const [insightsEnabled, setInsightsEnabled] = useState(() =>
+    isInsightEnabledSync("sleep"),
+  );
 
   // User ID resolution
   const [realUserId, setRealUserId] = useState(null);
@@ -101,6 +105,13 @@ const SleepTrackerScreen = () => {
       .getUser()
       .then(({ data: { user } }) => setRealUserId(user?.id));
   }, []);
+
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      isInsightEnabled("sleep").then(setInsightsEnabled);
+    });
+    return unsub;
+  }, [navigation]);
 
   // Helper functions
   const getTodayString = () => {
@@ -1055,7 +1066,7 @@ const SleepTrackerScreen = () => {
           </View> */}
 
           {/* Sleep Insights Section */}
-          {sleepInsights.length > 0 && (
+          {insightsEnabled && sleepInsights.length > 0 && (
             <View style={styles.insightsCard}>
               <View style={styles.sectionHeaderRow}>
                 <View>
@@ -1083,7 +1094,7 @@ const SleepTrackerScreen = () => {
           )}
 
           {/* Sleep Recommendations Section */}
-          {sleepRecommendations.length > 0 && (
+          {insightsEnabled && sleepRecommendations.length > 0 && (
             <View style={styles.recommendationsCard}>
               <View style={styles.sectionHeaderRow}>
                 <View>

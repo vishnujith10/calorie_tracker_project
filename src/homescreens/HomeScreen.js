@@ -42,6 +42,7 @@ import {
     updateFoodStreak,
 } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
+import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 
 const screenWidth = Dimensions.get("window").width;
 const globalHomeCache = getHomeScreenCache();
@@ -282,6 +283,185 @@ function getCurrentWeekDates() {
   return week;
 }
 
+// Generate context-aware, supportive AI calorie insights for the bottom of HomeScreen
+function generateCalorieInsights({
+  foodLogs = [],
+  todayLogs = [],
+  calorie_goal = 2000,
+  currentCalories = 0,
+  macro_targets = { protein_g: 150 },
+}) {
+  const insights = [];
+  const target = calorie_goal > 0 ? calorie_goal : 2000;
+  const currentHour = new Date().getHours();
+  const todayProgress = currentCalories / target;
+
+  // 1. Group past food logs by calendar date (YYYY-MM-DD)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const pastDayTotals = {};
+
+  foodLogs.forEach((log) => {
+    if (!log.created_at) return;
+    const dateKey = new Date(log.created_at).toISOString().slice(0, 10);
+    if (dateKey === todayStr) return; // skip today
+    pastDayTotals[dateKey] =
+      (pastDayTotals[dateKey] || 0) + (Number(log.calories) || 0);
+  });
+
+  // Get past days in reverse chronological order
+  const todayDate = new Date();
+  const pastDays = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(todayDate);
+    d.setDate(todayDate.getDate() - i);
+    const dStr = d.toISOString().slice(0, 10);
+    if (pastDayTotals[dStr] !== undefined) {
+      pastDays.push({ date: dStr, calories: pastDayTotals[dStr] });
+    }
+  }
+
+  // 2. Multi-day consistency & goal deviation checks
+  if (pastDays.length >= 2) {
+    let consecutiveNear = 0;
+    let consecutiveUnder = 0;
+    let consecutiveOver = 0;
+
+    for (const day of pastDays) {
+      const ratio = day.calories / target;
+      if (ratio >= 0.88 && ratio <= 1.12) consecutiveNear++;
+      else break;
+    }
+
+    for (const day of pastDays) {
+      const ratio = day.calories / target;
+      if (ratio < 0.72) consecutiveUnder++;
+      else break;
+    }
+
+    for (const day of pastDays) {
+      const ratio = day.calories / target;
+      if (ratio > 1.18) consecutiveOver++;
+      else break;
+    }
+
+    if (consecutiveNear >= 2) {
+      insights.push({
+        title: "Consistency Champion",
+        icon: "🎯",
+        message: `You've landed inside your target calorie zone for ${consecutiveNear} logged days in a row! Maintaining this level of nutritional consistency is the single most effective driver of long-term body recomposition.`,
+        action: "Keep riding this fantastic daily rhythm!",
+        priority: "low",
+      });
+    } else if (consecutiveUnder >= 2) {
+      insights.push({
+        title: "Fueling Check-in",
+        icon: "⚡",
+        message: `Your intake has landed well below your ${target} kcal target for ${consecutiveUnder} logged days. Consistently under-fueling can slow your metabolic rate and sap your daily energy.`,
+        action:
+          "Add wholesome calorie-dense foods (nuts, avocado, or a shake) to meet your minimum fuel needs.",
+        priority: "medium",
+      });
+    } else if (consecutiveOver >= 2) {
+      insights.push({
+        title: "Mindful Reset",
+        icon: "🧭",
+        message: `Calories have landed slightly above target over recent days. Fitness progress is built on multi-week trends, not single days. Small mindful swaps make staying on track feel effortless.`,
+        action:
+          "Focus on high-volume greens, lean protein, and drinking water before meals today.",
+        priority: "medium",
+      });
+    }
+  }
+
+  // 3. Today's pacing: Slow Intake vs. Fast Intake vs. Heavy Single Spike
+  if (currentHour >= 16 && todayProgress < 0.3 && todayLogs.length > 0) {
+    // Slow intake / backloading
+    insights.push({
+      title: "Slow Intake Notice",
+      icon: "⏳",
+      message: `You've only consumed ${Math.round(todayProgress * 100)}% of your calories (${currentCalories} kcal) by late afternoon. Backloading most calories into a late dinner often leads to digestive discomfort and sleep disruption.`,
+      action:
+        "Have a balanced snack now with protein and complex carbs to stabilize energy.",
+      priority: "medium",
+    });
+  } else if (currentHour <= 14 && todayProgress >= 0.75) {
+    // Irregular fast intake / early frontloading
+    insights.push({
+      title: "Pacing Your Energy",
+      icon: "📈",
+      message: `You've used ${Math.round(todayProgress * 100)}% of your daily calorie budget (${currentCalories} kcal) early today. Don't worry—you can still enjoy a satisfying evening without going over.`,
+      action:
+        "Focus on high-volume, lower-calorie choices like leafy greens, roasted veggies, and lean protein for dinner.",
+      priority: "medium",
+    });
+  } else if (
+    todayLogs.length >= 2 &&
+    todayLogs.some((m) => Number(m.calories) >= target * 0.65)
+  ) {
+    // Irregular fast spike in a single meal
+    insights.push({
+      title: "Meal Concentration",
+      icon: "⚖️",
+      message:
+        "A major portion of today's calories was concentrated in one dense meal. Distributing your calories more evenly across 3–4 meals maintains steady blood glucose and prevents energy crashes.",
+      action: "Keep your remaining meals light, hydrating, and fiber-rich.",
+      priority: "low",
+    });
+  }
+
+  // 4. Macro balance: Protein priority
+  const totalProtein = todayLogs.reduce(
+    (sum, l) => sum + (Number(l.protein) || 0),
+    0,
+  );
+  const proteinTarget =
+    macro_targets?.protein_g || Math.round((target * 0.3) / 4);
+  const proteinRatio = totalProtein / (proteinTarget || 1);
+
+  if (proteinRatio >= 0.85) {
+    insights.push({
+      title: "Optimal Protein Intake",
+      icon: "💪",
+      message: `Outstanding protein tracking today (${Math.round(totalProtein)}g)! Prioritizing protein maintains lean muscle mass, elevates your metabolic rate, and keeps cravings at bay.`,
+      action: "Keep up this high-quality macronutrient balance!",
+      priority: "low",
+    });
+  } else if (currentHour >= 18 && proteinRatio < 0.45 && todayLogs.length > 0) {
+    insights.push({
+      title: "Protein Boost Window",
+      icon: "🥩",
+      message: `Your protein intake is currently light at ${Math.round(totalProtein)}g out of your ${proteinTarget}g target. Hitting your protein threshold tonight will accelerate overnight muscular repair.`,
+      action:
+        "Include a quality protein source in your dinner (eggs, chicken, fish, tofu, or lentils).",
+      priority: "low",
+    });
+  }
+
+  // 5. Daily balanced pacing / motivational mindset fallback
+  if (todayProgress >= 0.5 && todayProgress <= 0.9) {
+    const remaining = Math.max(0, target - currentCalories);
+    insights.push({
+      title: "Balanced Daily Pacing",
+      icon: "✨",
+      message: `You are tracking smoothly at ${currentCalories} of ${target} kcal (${Math.round(todayProgress * 100)}%). You have a comfortable ${remaining} kcal buffer for a mindful, delicious evening.`,
+      action: "Savor your remaining meal and stay well hydrated!",
+      priority: "low",
+    });
+  }
+
+  // Guaranteed fallback
+  insights.push({
+    title: "Nutritional Mindset",
+    icon: "🌱",
+    message:
+      "Energy balance is about consistent daily averages, not robotic perfection. Every wholesome food choice compounds into permanent vitality.",
+    action: "Focus on nourishment, listen to your hunger cues, and stay consistent.",
+    priority: "low",
+  });
+
+  return insights;
+}
+
 const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -332,6 +512,13 @@ const HomeScreen = ({ navigation }) => {
   const [userName, setUserName] = useState("User");
   const [recentMeals, setRecentMeals] = useState(
     () => globalHomeCache.cachedData?.recentMeals || [],
+  );
+  const [calorieInsights, setCalorieInsights] = useState(
+    () => globalHomeCache.cachedData?.calorieInsights || [],
+  );
+  const [activeCalorieInsightIndex, setActiveCalorieInsightIndex] = useState(0);
+  const [calorieInsightsEnabled, setCalorieInsightsEnabled] = useState(() =>
+    isInsightEnabledSync("calories"),
   );
   const [expandedMeal, setExpandedMeal] = useState(null);
   const [selectedMeals, setSelectedMeals] = useState(new Set());
@@ -482,6 +669,9 @@ const HomeScreen = ({ navigation }) => {
         },
       );
       setRecentMeals(globalHomeCache.cachedData.recentMeals || []);
+      if (globalHomeCache.cachedData.calorieInsights) {
+        setCalorieInsights(globalHomeCache.cachedData.calorieInsights);
+      }
       return;
     }
 
@@ -544,6 +734,9 @@ const HomeScreen = ({ navigation }) => {
           },
         );
         setRecentMeals(globalHomeCache.cachedData.recentMeals || []);
+        if (globalHomeCache.cachedData.calorieInsights) {
+          setCalorieInsights(globalHomeCache.cachedData.calorieInsights);
+        }
         globalHomeCache.cacheHits++;
 
         fetchCaloriesBurned();
@@ -591,6 +784,9 @@ const HomeScreen = ({ navigation }) => {
           },
         );
         setRecentMeals(globalHomeCache.cachedData.recentMeals || []);
+        if (globalHomeCache.cachedData.calorieInsights) {
+          setCalorieInsights(globalHomeCache.cachedData.calorieInsights);
+        }
         globalHomeCache.cacheHits++;
       }
 
@@ -628,6 +824,10 @@ const HomeScreen = ({ navigation }) => {
         }
       };
       loadStreak();
+
+      isInsightEnabled("calories").then((enabled) => {
+        setCalorieInsightsEnabled(enabled);
+      });
     }, [user?.id, selectedDate]),
   );
 
@@ -689,6 +889,9 @@ const HomeScreen = ({ navigation }) => {
         },
       );
       setRecentMeals(globalHomeCache.cachedData.recentMeals || []);
+      if (globalHomeCache.cachedData.calorieInsights) {
+        setCalorieInsights(globalHomeCache.cachedData.calorieInsights);
+      }
       globalHomeCache.cacheHits++;
       return;
     }
@@ -705,6 +908,9 @@ const HomeScreen = ({ navigation }) => {
         },
       );
       setRecentMeals(globalHomeCache.cachedData.recentMeals || []);
+      if (globalHomeCache.cachedData.calorieInsights) {
+        setCalorieInsights(globalHomeCache.cachedData.calorieInsights);
+      }
       globalHomeCache.cacheHits++;
     }
 
@@ -758,10 +964,20 @@ const HomeScreen = ({ navigation }) => {
       );
       setRecentMeals(withUrls);
 
+      const generatedInsights = generateCalorieInsights({
+        foodLogs: logs || [],
+        todayLogs: filteredLogs || [],
+        calorie_goal: onboardingData?.daily_calorie_goal || dailyGoal || 2000,
+        currentCalories: newTotals.calories,
+        macro_targets,
+      });
+      setCalorieInsights(generatedInsights);
+
       globalHomeCache.cachedData = {
         foodLogs: filteredLogs,
         totals: newTotals,
         recentMeals: withUrls,
+        calorieInsights: generatedInsights,
         dateKey: dateKey,
       };
 
@@ -1381,6 +1597,98 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
         </View>
+
+        {/* Calorie Insight Card - Bottom-most part of HomeScreen (Single Insight View) */}
+        {calorieInsightsEnabled && calorieInsights.length > 0 && (
+          <View style={styles.calorieInsightCard}>
+            <View style={styles.calorieInsightHeader}>
+              <View style={styles.calorieInsightHeaderLeft}>
+                <View style={styles.calorieInsightIconShell}>
+                  <Ionicons
+                    name="bulb-outline"
+                    size={18}
+                    color={palette.primary}
+                  />
+                </View>
+                <View>
+                  <Text style={styles.calorieInsightEyebrow}>Nutrition Support</Text>
+                  <Text style={styles.calorieInsightTitle}>Calorie Insight</Text>
+                </View>
+              </View>
+
+              {calorieInsights.length > 1 && (
+                <View style={styles.insightNavRow}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActiveCalorieInsightIndex((prev) =>
+                        prev === 0 ? calorieInsights.length - 1 : prev - 1,
+                      )
+                    }
+                    style={styles.insightNavBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={16}
+                      color={palette.primary}
+                    />
+                  </TouchableOpacity>
+                  <Text style={styles.insightNavCount}>
+                    {(activeCalorieInsightIndex % calorieInsights.length) + 1}/
+                    {calorieInsights.length}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActiveCalorieInsightIndex(
+                        (prev) => (prev + 1) % calorieInsights.length,
+                      )
+                    }
+                    style={styles.insightNavBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={palette.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {(() => {
+              const insight =
+                calorieInsights[
+                  activeCalorieInsightIndex % calorieInsights.length
+                ];
+              if (!insight) return null;
+              return (
+                <View
+                  style={[
+                    styles.calorieInsightItem,
+                    insight.priority === "high" &&
+                      styles.calorieInsightItemHigh,
+                  ]}
+                >
+                  <Text style={styles.calorieInsightEmoji}>{insight.icon}</Text>
+                  <View style={styles.calorieInsightContent}>
+                    <Text style={styles.calorieInsightHeading}>
+                      {insight.title}
+                    </Text>
+                    <Text style={styles.calorieInsightMessage}>
+                      {insight.message}
+                    </Text>
+                    {insight.action ? (
+                      <Text style={styles.calorieInsightAction}>
+                        {insight.action}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })()}
+          </View>
+        )}
       </ScrollView>
 
       <FooterBar
@@ -2174,6 +2482,124 @@ const createStyles = (palette, isDark) =>
       fontFamily: "Lexend-Bold",
       fontSize: 16,
       color: palette.primary,
+    },
+
+    /* Calorie Insights Card (Bottom of HomeScreen) */
+    calorieInsightCard: {
+      backgroundColor: palette.card,
+      borderRadius: 24,
+      padding: 16,
+      marginHorizontal: 18,
+      marginTop: 10,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    calorieInsightHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    calorieInsightHeaderLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    calorieInsightIconShell: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: palette.highlight,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    calorieInsightEyebrow: {
+      fontSize: 11,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 1,
+    },
+    sectionEyebrow: {
+      fontSize: 12,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 2,
+    },
+    calorieInsightTitle: {
+      fontSize: 16.5,
+      fontFamily: "Lexend-Bold",
+      color: palette.textPrimary,
+      marginTop: 1,
+    },
+    calorieInsightItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    calorieInsightItemHigh: {
+      backgroundColor: isDark ? "rgba(217,119,6,0.18)" : "#FDF3E7",
+      borderColor: "#D97706",
+    },
+    calorieInsightEmoji: {
+      fontSize: 22,
+      marginRight: 12,
+      marginTop: 2,
+    },
+    calorieInsightContent: {
+      flex: 1,
+    },
+    calorieInsightHeading: {
+      fontSize: 14.5,
+      fontFamily: "Lexend-SemiBold",
+      color: palette.textPrimary,
+      marginBottom: 3,
+    },
+    calorieInsightMessage: {
+      fontSize: 13,
+      fontFamily: "Manrope-Regular",
+      color: palette.textSecondary,
+      marginBottom: 6,
+      lineHeight: 19,
+    },
+    calorieInsightAction: {
+      fontSize: 12.5,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.primary,
+    },
+    insightNavRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.cardSecondary,
+      borderRadius: 14,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: palette.border,
+      gap: 6,
+    },
+    insightNavBtn: {
+      padding: 2,
+    },
+    insightNavCount: {
+      fontSize: 12,
+      fontFamily: "Manrope-SemiBold",
+      color: palette.textSecondary,
     },
   });
 

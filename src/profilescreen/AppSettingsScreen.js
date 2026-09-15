@@ -157,14 +157,12 @@ const AppSettingsScreen = () => {
   const [aiInsights, setAiInsights] = useState(() =>
     getCachedOrDefault("aiInsights", true),
   );
-  const [insightFrequency, setInsightFrequency] = useState(() =>
-    getCachedOrDefault("insightFrequency", "Weekly"),
-  );
   const [focusAreas, setFocusAreas] = useState(() =>
     getCachedOrDefault("focusAreas", {
       calories: true,
       sleep: true,
       hydration: true,
+      weight: true,
     }),
   );
 
@@ -247,9 +245,6 @@ const AppSettingsScreen = () => {
         setAiInsights((prev) =>
           prev !== cached.aiInsights ? cached.aiInsights : prev,
         );
-        setInsightFrequency((prev) =>
-          prev !== cached.insightFrequency ? cached.insightFrequency : prev,
-        );
         setFocusAreas((prev) => {
           const prevStr = JSON.stringify(prev);
           const cachedStr = JSON.stringify(cached.focusAreas);
@@ -282,11 +277,11 @@ const AppSettingsScreen = () => {
           hydrationReminderTime: data.hydration_reminder_time,
           sleepReminderTime: data.sleep_reminder_time,
           aiInsights: data.ai_insights ?? true,
-          insightFrequency: data.insight_frequency ?? "Weekly",
           focusAreas: data.focus_areas || {
             calories: true,
             sleep: true,
-            Hydration: false,
+            hydration: true,
+            weight: true,
           },
           anonymousDataSharing: data.anonymous_data_sharing ?? true,
           language: data.language ?? "English",
@@ -356,11 +351,6 @@ const AppSettingsScreen = () => {
             ? globalSettingsCache.cachedData.aiInsights
             : prev,
         );
-        setInsightFrequency((prev) =>
-          prev !== globalSettingsCache.cachedData.insightFrequency
-            ? globalSettingsCache.cachedData.insightFrequency
-            : prev,
-        );
         setFocusAreas((prev) => {
           const prevStr = JSON.stringify(prev);
           const cachedStr = JSON.stringify(
@@ -406,7 +396,6 @@ const AppSettingsScreen = () => {
         hydration_reminder_time: hydrationTimeStr,
         sleep_reminder_time: sleepTimeStr,
         ai_insights: aiInsights,
-        insight_frequency: insightFrequency,
         focus_areas: focusAreas,
         anonymous_data_sharing: anonymousDataSharing,
         language: language,
@@ -427,7 +416,6 @@ const AppSettingsScreen = () => {
         hydrationReminderTime: hydrationTimeStr,
         sleepReminderTime: sleepTimeStr,
         aiInsights,
-        insightFrequency,
         focusAreas,
         anonymousDataSharing,
         language,
@@ -447,7 +435,6 @@ const AppSettingsScreen = () => {
     hydrationReminderTime,
     sleepReminderTime,
     aiInsights,
-    insightFrequency,
     focusAreas,
     anonymousDataSharing,
     language,
@@ -871,7 +858,6 @@ const AppSettingsScreen = () => {
     return () => clearTimeout(timeoutId);
   }, [
     aiInsights,
-    insightFrequency,
     focusAreas,
     anonymousDataSharing,
     language,
@@ -1399,47 +1385,50 @@ const AppSettingsScreen = () => {
                   color={palette.primary}
                 />
                 <Text style={styles.infoText}>
-                  AI insights help you reflect and optimize your routine.
+                  AI insights help you reflect, stay motivated, and optimize your routine.
                 </Text>
               </View>
 
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionTitle}>Insight Frequency</Text>
-                {renderPillGroup(
-                  ["Daily", "Weekly"],
-                  insightFrequency,
-                  setInsightFrequency,
-                )}
-              </View>
+              {renderToggleItem(
+                "Enable Insights",
+                aiInsights,
+                setAiInsights,
+                "Show smart tips & supportive feedback",
+              )}
 
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionTitle}>Focus Areas</Text>
-                <View style={styles.pillGroup}>
-                  {Object.entries(focusAreas).map(([area, isSelected]) => (
-                    <TouchableOpacity
-                      key={area}
-                      style={[
-                        styles.pillButton,
-                        isSelected
-                          ? styles.pillButtonSelected
-                          : styles.pillButtonUnselected,
-                      ]}
-                      onPress={() => handleFocusAreaToggle(area)}
-                    >
-                      <Text
+              {aiInsights && (
+                <View style={styles.subsection}>
+                  <Text style={styles.subsectionTitle}>Focus Areas</Text>
+                  <Text style={styles.subsectionHint}>
+                    Select where you'd like insights displayed:
+                  </Text>
+                  <View style={styles.pillGroup}>
+                    {Object.entries(focusAreas).map(([area, isSelected]) => (
+                      <TouchableOpacity
+                        key={area}
                         style={[
-                          styles.pillButtonText,
+                          styles.pillButton,
                           isSelected
-                            ? styles.pillButtonTextSelected
-                            : styles.pillButtonTextUnselected,
+                            ? styles.pillButtonSelected
+                            : styles.pillButtonUnselected,
                         ]}
+                        onPress={() => handleFocusAreaToggle(area)}
                       >
-                        {area.charAt(0).toUpperCase() + area.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.pillButtonText,
+                            isSelected
+                              ? styles.pillButtonTextSelected
+                              : styles.pillButtonTextUnselected,
+                          ]}
+                        >
+                          {area.charAt(0).toUpperCase() + area.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
             </View>,
           )}
 
@@ -1684,11 +1673,18 @@ const createStyles = (palette, isDark) =>
 
     subsection: {
       marginBottom: 14,
+      marginTop: 8,
     },
     subsectionTitle: {
       fontSize: 13.5,
       fontFamily: "Lexend-SemiBold",
       color: palette.textPrimary,
+      marginBottom: 4,
+    },
+    subsectionHint: {
+      fontSize: 12,
+      fontFamily: "Manrope-Regular",
+      color: palette.textSecondary,
       marginBottom: 10,
     },
 
