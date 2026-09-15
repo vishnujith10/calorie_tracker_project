@@ -37,7 +37,9 @@ import {
 } from "../utils/cacheManager";
 import { getTodayCaloriesBurned } from "../utils/calorieCalculator";
 import {
+    evaluateYesterdayStreak,
     getFoodStreak,
+    getStreakRiskCalories,
     recalculateFoodStreak,
     updateFoodStreak,
 } from "../utils/streakService";
@@ -129,24 +131,33 @@ const HomeHeader = React.memo(
 HomeHeader.displayName = "HomeHeader";
 
 const StreakBadge = React.memo(
-  ({ calorieStreak, styles, themeKey }) => {
+  ({ calorieStreak, graceActive, maxStreak, styles, themeKey }) => {
+    const emoji = graceActive ? '❄️' : '🔥';
+    const label =
+      calorieStreak > 0
+        ? `${calorieStreak}-day streak`
+        : 'Start your streak!';
     return (
-      <View style={styles.streakBadge}>
-        <Text style={styles.streakEmoji}>🔥</Text>
-        <Text style={styles.streakText}>
-          {calorieStreak > 0 ? `${calorieStreak}-day streak` : "0-day streak"}
-        </Text>
+      <View style={[
+        styles.streakBadge,
+        graceActive && styles.streakBadgeGrace,
+      ]}>
+        <Text style={styles.streakEmoji}>{emoji}</Text>
+        <Text style={styles.streakText}>{label}</Text>
+        {maxStreak > 0 && (
+          <Text style={styles.streakMaxText}> · Best {maxStreak}</Text>
+        )}
       </View>
     );
   },
-  (prevProps, nextProps) => {
-    return (
-      prevProps.calorieStreak === nextProps.calorieStreak &&
-      prevProps.themeKey === nextProps.themeKey
-    );
-  },
+  (prevProps, nextProps) => (
+    prevProps.calorieStreak === nextProps.calorieStreak &&
+    prevProps.graceActive === nextProps.graceActive &&
+    prevProps.maxStreak === nextProps.maxStreak &&
+    prevProps.themeKey === nextProps.themeKey
+  ),
 );
-StreakBadge.displayName = "StreakBadge";
+StreakBadge.displayName = 'StreakBadge';
 
 const FooterBar = ({
   navigation,
@@ -529,15 +540,34 @@ const HomeScreen = ({ navigation }) => {
       streakCache.cachedStreak !== null &&
       now - streakCache.lastFetch < streakCache.CACHE_DURATION
     ) {
-      return streakCache.cachedStreak;
+      return streakCache.cachedStreak?.streak ?? streakCache.cachedStreak ?? 0;
     }
     return 0;
   });
+  const [graceActive, setGraceActive] = useState(false);
+  const [maxStreak, setMaxStreak] = useState(0);
 
   const calorieStreakRef = React.useRef(calorieStreak);
   React.useEffect(() => {
     calorieStreakRef.current = calorieStreak;
   }, [calorieStreak]);
+
+  // Helper: update streak state from a getFoodStreak result object
+  const applyStreakResult = React.useCallback((result) => {
+    if (!result) return;
+    // result can be { streak, maxStreak, graceActive } or a plain number (legacy)
+    const streakVal = typeof result === 'object' ? (result.streak ?? 0) : result;
+    const maxVal = typeof result === 'object' ? (result.maxStreak ?? 0) : 0;
+    const grace = typeof result === 'object' ? (result.graceActive ?? false) : false;
+    streakCache.cachedStreak = result;
+    streakCache.lastFetch = Date.now();
+    if (streakVal !== calorieStreakRef.current) {
+      calorieStreakRef.current = streakVal;
+      setCalorieStreak(streakVal);
+    }
+    setGraceActive(grace);
+    setMaxStreak(maxVal);
+  }, []);
 
   const [totalCaloriesBurned, setTotalCaloriesBurned] = useState(0);
   const [calorieBreakdown, setCalorieBreakdown] = useState({
@@ -749,23 +779,16 @@ const HomeScreen = ({ navigation }) => {
               streakCache.cachedStreak !== null &&
               streakTimeSinceLastFetch < streakCache.CACHE_DURATION
             ) {
-              const cachedValue = streakCache.cachedStreak;
-              if (cachedValue !== calorieStreakRef.current) {
-                calorieStreakRef.current = cachedValue;
-                setCalorieStreak(cachedValue);
-              }
+              applyStreakResult(streakCache.cachedStreak);
               return;
             }
 
-            const currentStreak = await getFoodStreak(user.id);
-            streakCache.cachedStreak = currentStreak;
-            streakCache.lastFetch = streakNow;
-            if (currentStreak !== calorieStreakRef.current) {
-              calorieStreakRef.current = currentStreak;
-              setCalorieStreak(currentStreak);
-            }
+            // Evaluate yesterday lazily (idempotent — skips if already done today)
+            await evaluateYesterdayStreak(user.id, dailyGoal, goal_type);
+            const result = await getFoodStreak(user.id);
+            applyStreakResult(result);
           } catch (error) {
-            console.error("Error loading streak:", error);
+            console.error('Error loading streak:', error);
           }
         };
         loadStreak();
@@ -804,23 +827,16 @@ const HomeScreen = ({ navigation }) => {
             streakCache.cachedStreak !== null &&
             streakTimeSinceLastFetch < streakCache.CACHE_DURATION
           ) {
-            const cachedValue = streakCache.cachedStreak;
-            if (cachedValue !== calorieStreakRef.current) {
-              calorieStreakRef.current = cachedValue;
-              setCalorieStreak(cachedValue);
-            }
+            applyStreakResult(streakCache.cachedStreak);
             return;
           }
 
-          const currentStreak = await getFoodStreak(user.id);
-          streakCache.cachedStreak = currentStreak;
-          streakCache.lastFetch = streakNow;
-          if (currentStreak !== calorieStreakRef.current) {
-            calorieStreakRef.current = currentStreak;
-            setCalorieStreak(currentStreak);
-          }
+          // Evaluate yesterday lazily (idempotent — skips if already done today)
+          await evaluateYesterdayStreak(user.id, dailyGoal, goal_type);
+          const result = await getFoodStreak(user.id);
+          applyStreakResult(result);
         } catch (error) {
-          console.error("Error loading streak:", error);
+          console.error('Error loading streak:', error);
         }
       };
       loadStreak();
@@ -984,22 +1000,12 @@ const HomeScreen = ({ navigation }) => {
       globalHomeCache.lastFetchTime = Date.now();
 
       if (user.id && filteredLogs.length > 0) {
-        await updateFoodStreak(user.id);
-        const currentStreak = await getFoodStreak(user.id);
-        streakCache.cachedStreak = currentStreak;
-        streakCache.lastFetch = Date.now();
-        if (currentStreak !== calorieStreakRef.current) {
-          calorieStreakRef.current = currentStreak;
-          setCalorieStreak(currentStreak);
-        }
+        await updateFoodStreak(user.id, dailyGoal, goal_type);
+        const result = await getFoodStreak(user.id);
+        applyStreakResult(result);
       } else if (user.id) {
-        const currentStreak = await getFoodStreak(user.id);
-        streakCache.cachedStreak = currentStreak;
-        streakCache.lastFetch = Date.now();
-        if (currentStreak !== calorieStreakRef.current) {
-          calorieStreakRef.current = currentStreak;
-          setCalorieStreak(currentStreak);
-        }
+        const result = await getFoodStreak(user.id);
+        applyStreakResult(result);
       }
     } catch (error) {
       console.error("Error fetching food logs:", error);
@@ -1104,25 +1110,38 @@ const HomeScreen = ({ navigation }) => {
     navigation.navigate("VoiceCalorieScreen", { mealType, selectedDate });
   };
 
+  const toggleMealSelection = (mealId) => {
+    if (!mealId) return;
+    setSelectedMeals((prevSelected) => {
+      const next = new Set(prevSelected);
+      if (next.has(mealId)) {
+        next.delete(mealId);
+      } else {
+        next.add(mealId);
+      }
+      if (next.size === 0) {
+        setIsSelectionMode(false);
+      } else {
+        setIsSelectionMode(true);
+      }
+      return next;
+    });
+  };
+
   const handleMealLongPress = (mealId) => {
+    if (!mealId) return;
     if (!isSelectionMode) {
       setIsSelectionMode(true);
       setSelectedMeals(new Set([mealId]));
+    } else {
+      toggleMealSelection(mealId);
     }
   };
 
   const handleMealPress = (mealId, index) => {
+    if (!mealId) return;
     if (isSelectionMode) {
-      const newSelected = new Set(selectedMeals);
-      if (newSelected.has(mealId)) {
-        newSelected.delete(mealId);
-        if (newSelected.size === 0) {
-          setIsSelectionMode(false);
-        }
-      } else {
-        newSelected.add(mealId);
-      }
-      setSelectedMeals(newSelected);
+      toggleMealSelection(mealId);
     } else {
       setExpandedMeal(expandedMeal === index ? null : index);
     }
@@ -1130,7 +1149,14 @@ const HomeScreen = ({ navigation }) => {
 
   const handleDeleteSelected = async () => {
     try {
-      const selectedIds = Array.from(selectedMeals);
+      const selectedIds = Array.from(selectedMeals).filter(
+        (id) => typeof id === "string" && !id.startsWith("meal-")
+      );
+      if (selectedIds.length === 0) {
+        setSelectedMeals(new Set());
+        setIsSelectionMode(false);
+        return;
+      }
       await Promise.all(selectedIds.map((id) => deleteFoodLog(id)));
 
       globalHomeCache.cachedData = null;
@@ -1138,14 +1164,9 @@ const HomeScreen = ({ navigation }) => {
       invalidateHomeScreenCache();
       await fetchFoodLogs(selectedDate);
 
-      await recalculateFoodStreak(user.id);
-      const updatedStreak = await getFoodStreak(user.id);
-      streakCache.cachedStreak = updatedStreak;
-      streakCache.lastFetch = Date.now();
-      if (updatedStreak !== calorieStreakRef.current) {
-        calorieStreakRef.current = updatedStreak;
-        setCalorieStreak(updatedStreak);
-      }
+      await recalculateFoodStreak(user.id, dailyGoal, goal_type);
+      const updatedResult = await getFoodStreak(user.id);
+      applyStreakResult(updatedResult);
 
       setSelectedMeals(new Set());
       setIsSelectionMode(false);
@@ -1363,9 +1384,32 @@ const HomeScreen = ({ navigation }) => {
 
             <StreakBadge
               calorieStreak={calorieStreak}
+              graceActive={graceActive}
+              maxStreak={maxStreak}
               styles={styles}
               themeKey={themeKey}
             />
+            {/* Streak-at-risk warning — shown from midday if today's goal not yet met */}
+            {(() => {
+              const hour = new Date().getHours();
+              const riskCals = getStreakRiskCalories(
+                totals.calories,
+                dailyGoal,
+                goal_type,
+                calorieStreak,
+                graceActive,
+              );
+              if (hour >= 12 && riskCals !== null && riskCals > 0) {
+                return (
+                  <View style={styles.streakRiskBanner}>
+                    <Text style={styles.streakRiskText}>
+                      ⚡ Log {Math.round(riskCals)} more kcal to keep your streak!
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
           </View>
         </View>
 
@@ -1459,16 +1503,29 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>Recent Meals</Text>
             </View>
 
-            {isSelectionMode && selectedMeals.size > 0 && (
-              <TouchableOpacity
-                onPress={handleDeleteSelected}
-                style={styles.deleteActionBtn}
-              >
-                <Ionicons name="trash-outline" size={16} color="#fff" />
-                <Text style={styles.deleteActionText}>
-                  Delete ({selectedMeals.size})
-                </Text>
-              </TouchableOpacity>
+            {isSelectionMode && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedMeals(new Set());
+                    setIsSelectionMode(false);
+                  }}
+                  style={styles.cancelSelectionBtn}
+                >
+                  <Text style={styles.cancelSelectionText}>Cancel</Text>
+                </TouchableOpacity>
+                {selectedMeals.size > 0 && (
+                  <TouchableOpacity
+                    onPress={handleDeleteSelected}
+                    style={styles.deleteActionBtn}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#fff" />
+                    <Text style={styles.deleteActionText}>
+                      Delete ({selectedMeals.size})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
 
@@ -1487,72 +1544,76 @@ const HomeScreen = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.mealCardList}>
-              {recentMeals.map((meal, i) => (
-                <TouchableOpacity
-                  key={meal.id || i}
-                  onPress={() => handleMealPress(meal.id, i)}
-                  onLongPress={() => handleMealLongPress(meal.id)}
-                  style={[
-                    styles.mealLogCard,
-                    selectedMeals.has(meal.id) && styles.mealLogCardSelected,
-                    expandedMeal === i && styles.mealLogCardExpanded,
-                  ]}
-                  activeOpacity={0.88}
-                >
-                  <View style={styles.mealLogTopRow}>
-                    {meal.photo_url && (meal.photo_url.startsWith("http") || meal.photo_url.startsWith("file://")) ? (
-                      <Image
-                        source={{ uri: meal.photo_url }}
-                        style={styles.mealLogImage}
-                      />
-                    ) : (
-                      <Image
-                        source={{
-                          uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
-                        }}
-                        style={styles.mealLogImage}
-                        defaultSource={{
-                          uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
-                        }}
-                      />
-                    )}
+              {recentMeals.map((meal, i) => {
+                const mealId = meal.id || meal._id || `meal-${i}`;
+                const isSelected = !!mealId && selectedMeals.has(mealId);
 
-                    <View style={styles.mealLogContent}>
-                      <View style={styles.mealLogTextWrap}>
-                        <Text
-                          style={styles.mealLogTitle}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {meal.food_name || meal.meal_type || "Meal"}
-                        </Text>
-                        <Text style={styles.mealLogSub}>
-                          {meal.meal_type || "Logged meal"}
-                        </Text>
-                      </View>
+                return (
+                  <TouchableOpacity
+                    key={mealId}
+                    onPress={() => handleMealPress(mealId, i)}
+                    onLongPress={() => handleMealLongPress(mealId)}
+                    style={[
+                      styles.mealLogCard,
+                      isSelected && styles.mealLogCardSelected,
+                      expandedMeal === i && styles.mealLogCardExpanded,
+                    ]}
+                    activeOpacity={0.88}
+                  >
+                    <View style={styles.mealLogTopRow}>
+                      {meal.photo_url && (meal.photo_url.startsWith("http") || meal.photo_url.startsWith("file://")) ? (
+                        <Image
+                          source={{ uri: meal.photo_url }}
+                          style={styles.mealLogImage}
+                        />
+                      ) : (
+                        <Image
+                          source={{
+                            uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
+                          }}
+                          style={styles.mealLogImage}
+                          defaultSource={{
+                            uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
+                          }}
+                        />
+                      )}
 
-                      <View style={styles.mealLogRight}>
-                        <Text style={styles.mealLogCalories}>
-                          {meal.calories ? `${meal.calories} kcal` : "-- kcal"}
-                        </Text>
-                        {isSelectionMode && (
-                          <Ionicons
-                            name={
-                              selectedMeals.has(meal.id)
-                                ? "checkmark-circle"
-                                : "ellipse-outline"
-                            }
-                            size={22}
-                            color={
-                              selectedMeals.has(meal.id)
-                                ? palette.primary
-                                : palette.borderStrong
-                            }
-                          />
-                        )}
+                      <View style={styles.mealLogContent}>
+                        <View style={styles.mealLogTextWrap}>
+                          <Text
+                            style={styles.mealLogTitle}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {meal.food_name || meal.meal_type || "Meal"}
+                          </Text>
+                          <Text style={styles.mealLogSub}>
+                            {meal.meal_type || "Logged meal"}
+                          </Text>
+                        </View>
+
+                        <View style={styles.mealLogRight}>
+                          <Text style={styles.mealLogCalories}>
+                            {meal.calories ? `${meal.calories} kcal` : "-- kcal"}
+                          </Text>
+                          {isSelectionMode && (
+                            <Ionicons
+                              name={
+                                isSelected
+                                  ? "checkmark-circle"
+                                  : "ellipse-outline"
+                              }
+                              size={22}
+                              color={
+                                isSelected
+                                  ? palette.primary
+                                  : palette.borderStrong
+                              }
+                            />
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </View>
 
                   {expandedMeal === i && (
                     <View style={styles.expandedSection}>
@@ -1593,7 +1654,8 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   )}
                 </TouchableOpacity>
-              ))}
+              );
+            })}
             </View>
           )}
         </View>
@@ -2063,8 +2125,8 @@ const createStyles = (palette, isDark) =>
     },
 
     streakBadge: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: palette.cardSecondary,
       paddingVertical: 8,
       paddingHorizontal: 12,
@@ -2073,15 +2135,42 @@ const createStyles = (palette, isDark) =>
       borderColor: palette.border,
     },
 
+    streakBadgeGrace: {
+      borderColor: '#4FC3F7',
+      backgroundColor: isDark ? 'rgba(79,195,247,0.10)' : 'rgba(79,195,247,0.12)',
+    },
+
     streakEmoji: {
       fontSize: 14,
       marginRight: 6,
     },
 
     streakText: {
-      fontFamily: "Lexend-SemiBold",
+      fontFamily: 'Lexend-SemiBold',
       fontSize: 12,
       color: palette.textPrimary,
+    },
+
+    streakMaxText: {
+      fontFamily: 'Lexend-Regular',
+      fontSize: 11,
+      color: palette.textSecondary,
+    },
+
+    streakRiskBanner: {
+      marginTop: 8,
+      backgroundColor: isDark ? 'rgba(255,165,0,0.12)' : 'rgba(255,140,0,0.10)',
+      borderRadius: 10,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,165,0,0.35)' : 'rgba(255,140,0,0.30)',
+    },
+
+    streakRiskText: {
+      fontFamily: 'Lexend-SemiBold',
+      fontSize: 12,
+      color: isDark ? '#FFB74D' : '#E65100',
     },
 
     summaryHintChip: {
@@ -2318,6 +2407,21 @@ const createStyles = (palette, isDark) =>
     recentMealsSection: {
       marginHorizontal: 18,
       marginBottom: 10,
+    },
+
+    cancelSelectionBtn: {
+      backgroundColor: palette.card,
+      borderColor: palette.border,
+      borderWidth: 1,
+      borderRadius: 16,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+    },
+
+    cancelSelectionText: {
+      color: palette.textSecondary,
+      fontFamily: "Lexend-Medium",
+      fontSize: 13,
     },
 
     deleteActionBtn: {

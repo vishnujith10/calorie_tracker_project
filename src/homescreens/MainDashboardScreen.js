@@ -109,26 +109,33 @@ const getTodaysQuote = () => {
 };
 
 const StreakBadge = React.memo(
-  ({ calorieStreak }) => {
+  ({ calorieStreak, graceActive, maxStreak }) => {
     const { colors, isDark } = useTheme();
     const streakStyles = React.useMemo(
       () => createStreakStyles(colors, isDark),
       [colors, isDark],
     );
+    const emoji = graceActive ? '❄️' : '🔥';
+    const label =
+      calorieStreak > 0 ? `${calorieStreak}-day streak` : 'Start your streak!';
 
     return (
-      <View style={streakStyles.badge}>
-        <Text style={streakStyles.emoji}>🔥</Text>
-        <Text style={streakStyles.text}>
-          {calorieStreak > 0 ? `${calorieStreak}-day streak` : "0-day streak"}
-        </Text>
+      <View style={[streakStyles.badge, graceActive && streakStyles.graceBadge]}>
+        <Text style={streakStyles.emoji}>{emoji}</Text>
+        <Text style={streakStyles.text}>{label}</Text>
+        {maxStreak > 0 && (
+          <Text style={streakStyles.maxText}> · Best {maxStreak}</Text>
+        )}
       </View>
     );
   },
-  (prevProps, nextProps) => prevProps.calorieStreak === nextProps.calorieStreak,
+  (prevProps, nextProps) =>
+    prevProps.calorieStreak === nextProps.calorieStreak &&
+    prevProps.graceActive === nextProps.graceActive &&
+    prevProps.maxStreak === nextProps.maxStreak,
 );
 
-StreakBadge.displayName = "StreakBadge";
+StreakBadge.displayName = 'StreakBadge';
 
 const FooterBar = ({ navigation, activeTab }) => {
   const insets = useSafeAreaInsets();
@@ -278,16 +285,35 @@ const MainDashboardScreen = ({ route }) => {
       streakCache.cachedStreak !== null &&
       now - streakCache.lastFetch < streakCache.CACHE_DURATION
     ) {
-      return streakCache.cachedStreak;
+      const cached = streakCache.cachedStreak;
+      return typeof cached === 'object' ? (cached.streak ?? 0) : cached;
     }
     return 0;
   });
+  const [graceActive, setGraceActive] = useState(false);
+  const [maxStreak, setMaxStreak] = useState(0);
 
   const calorieStreakRef = useRef(calorieStreak);
 
   useEffect(() => {
     calorieStreakRef.current = calorieStreak;
   }, [calorieStreak]);
+
+  // Helper: apply a getFoodStreak result object to state
+  const applyStreakResult = React.useCallback((result) => {
+    if (!result) return;
+    const streakVal = typeof result === 'object' ? (result.streak ?? 0) : result;
+    const maxVal = typeof result === 'object' ? (result.maxStreak ?? 0) : 0;
+    const grace = typeof result === 'object' ? (result.graceActive ?? false) : false;
+    streakCache.cachedStreak = result;
+    streakCache.lastFetch = Date.now();
+    setCalorieStreak((prev) => {
+      if (prev !== streakVal) { calorieStreakRef.current = streakVal; return streakVal; }
+      return prev;
+    });
+    setGraceActive(grace);
+    setMaxStreak(maxVal);
+  }, []);
 
   useEffect(() => {
     let backButtonPressed = 0;
@@ -811,19 +837,11 @@ const MainDashboardScreen = ({ route }) => {
     const updateStreakFromCache = () => {
       streakCache.lastFetch = 0;
       getFoodStreak(realUserId)
-        .then((currentStreak) => {
-          streakCache.cachedStreak = currentStreak;
-          streakCache.lastFetch = Date.now();
-          setCalorieStreak((prevStreak) => {
-            if (prevStreak !== currentStreak) {
-              calorieStreakRef.current = currentStreak;
-              return currentStreak;
-            }
-            return prevStreak;
-          });
+        .then((result) => {
+          applyStreakResult(result);
         })
         .catch((error) => {
-          console.error("Error fetching streak:", error);
+          console.error('Error fetching streak:', error);
         });
     };
 
@@ -856,25 +874,16 @@ const MainDashboardScreen = ({ route }) => {
         timeSinceLastFetch >= streakCache.CACHE_DURATION;
 
       if (!cacheExpired) {
-        const cachedValue = streakCache.cachedStreak;
-        if (cachedValue !== calorieStreakRef.current) {
-          calorieStreakRef.current = cachedValue;
-          setCalorieStreak(cachedValue);
-        }
+        applyStreakResult(streakCache.cachedStreak);
         return;
       }
 
       const loadStreak = async () => {
         try {
-          const currentStreak = await getFoodStreak(realUserId);
-          streakCache.cachedStreak = currentStreak;
-          streakCache.lastFetch = now;
-          if (currentStreak !== calorieStreakRef.current) {
-            calorieStreakRef.current = currentStreak;
-            setCalorieStreak(currentStreak);
-          }
+          const result = await getFoodStreak(realUserId);
+          applyStreakResult(result);
         } catch (error) {
-          console.error("Error loading streak:", error);
+          console.error('Error loading streak:', error);
         }
       };
 
@@ -1323,7 +1332,11 @@ const MainDashboardScreen = ({ route }) => {
                 {hasCheckedInToday ? "View Check-in" : "Daily Check-in"}
               </Text>
             </TouchableOpacity>
-            <StreakBadge calorieStreak={calorieStreak} />
+            <StreakBadge
+              calorieStreak={calorieStreak}
+              graceActive={graceActive}
+              maxStreak={maxStreak}
+            />
           </View>
         </View>
 
@@ -2671,23 +2684,32 @@ const createFooterStyles = (colors, isDark) =>
 const createStreakStyles = (colors, isDark) =>
   StyleSheet.create({
     badge: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: isDark ? "rgba(168, 213, 206, 0.12)" : "#E4F3F0",
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(168, 213, 206, 0.12)' : '#E4F3F0',
       paddingVertical: 9,
       paddingHorizontal: 12,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: isDark ? "rgba(168, 213, 206, 0.18)" : "#CFE7E2",
+      borderColor: isDark ? 'rgba(168, 213, 206, 0.18)' : '#CFE7E2',
+    },
+    graceBadge: {
+      borderColor: '#4FC3F7',
+      backgroundColor: isDark ? 'rgba(79,195,247,0.10)' : 'rgba(79,195,247,0.12)',
     },
     emoji: {
       fontSize: 14,
       marginRight: 5,
     },
     text: {
-      fontFamily: "Lexend-SemiBold",
+      fontFamily: 'Lexend-SemiBold',
       fontSize: 12,
-      color: isDark ? "#EAF7F5" : "#1F4E4A",
+      color: isDark ? '#EAF7F5' : '#1F4E4A',
+    },
+    maxText: {
+      fontFamily: 'Lexend-Regular',
+      fontSize: 11,
+      color: isDark ? '#8FB2AC' : '#5B7873',
     },
   });
 
