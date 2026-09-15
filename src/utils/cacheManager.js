@@ -175,6 +175,26 @@ export const updateMainDashboardSleepCache = (sleepData) => {
   }
 };
 
+// Optimistic deletion for sleep log
+export const deleteMainDashboardSleepCache = (dateStr) => {
+  if (mainDashboardCache.cachedData) {
+    const targetDate = dateStr || new Date().toISOString().slice(0, 10);
+    const existingLogs = (mainDashboardCache.cachedData.sleepLogs || []).filter(
+      (log) => log.date?.slice(0, 10) !== targetDate,
+    );
+    const currentTodayDate = mainDashboardCache.cachedData.todaySleepLog?.date?.slice(0, 10);
+    const isTodayDeleted = !currentTodayDate || currentTodayDate === targetDate;
+
+    mainDashboardCache.cachedData = {
+      ...mainDashboardCache.cachedData,
+      sleepLogs: existingLogs,
+      todaySleepLog: isTodayDeleted ? null : mainDashboardCache.cachedData.todaySleepLog,
+    };
+
+    mainDashboardCache.lastFetchTime = 0; // Force refetch on next focus
+  }
+};
+
 // Invalidate all caches
 export const invalidateAllCaches = () => {
   invalidateMainDashboardCache();

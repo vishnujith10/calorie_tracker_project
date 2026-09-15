@@ -170,72 +170,56 @@ const SleepTrackerScreen = () => {
       .padStart(2, "0")}:00`;
   };
 
-  // FIXED: Memoized button states to prevent infinite re-renders and flickering
-  const buttonStates = useMemo(() => {
-    // Use cached button states if available and data hasn't changed
-    if (
-      globalSleepCache.buttonStates &&
-      globalSleepCache.cachedData === sleepLogs &&
-      !isEditingSchedule
-    ) {
-      return globalSleepCache.buttonStates;
-    }
-
-    const todayStr = getTodayString();
-    const todayLog = sleepLogs.find(
+  const todayStr = getTodayString();
+  const todayLog = useMemo(() => {
+    return sleepLogs.find(
       (l) => getDateOnly(l.date) === todayStr && l.user_id === realUserId,
     );
+  }, [sleepLogs, realUserId, todayStr]);
 
-    let newButtonStates;
+  // Sync scheduled times when todayLog changes
+  useEffect(() => {
+    if (todayLog) {
+      if (todayLog.start_time) setScheduledBedtime(todayLog.start_time);
+      if (todayLog.end_time) setScheduledWakeup(todayLog.end_time);
+      if (todayLog.quality) setQuality(todayLog.quality);
+      if (todayLog.mood) setMood(todayLog.mood);
+    }
+  }, [todayLog]);
 
+  const isTimeChanged = useMemo(() => {
+    if (!todayLog) return false;
+    return (
+      scheduledBedtime !== todayLog.start_time ||
+      scheduledWakeup !== todayLog.end_time
+    );
+  }, [todayLog, scheduledBedtime, scheduledWakeup]);
+
+  const buttonStates = useMemo(() => {
     if (!todayLog) {
-      // State 1: Before logging (no log today)
-      newButtonStates = {
-        canClickBedtime: true, // Always clickable
-        canClickWakeup: true, // Always clickable
-        canClickLog: scheduledBedtime && scheduledWakeup, // Only when both times set
-        logButtonEnabled: scheduledBedtime && scheduledWakeup,
+      const canLog = Boolean(scheduledBedtime && scheduledWakeup);
+      return {
+        canClickBedtime: true,
+        canClickWakeup: true,
+        canClickLog: canLog,
+        logButtonEnabled: canLog,
         hasLog: false,
+        buttonText: "Log Your Sleep",
       };
     } else {
-      // State 2: After logging (log exists today)
-      if (!isEditingSchedule) {
-        newButtonStates = {
-          canClickBedtime: false, // Non-clickable
-          canClickWakeup: false, // Non-clickable
-          canClickLog: false, // Non-clickable
-          logButtonEnabled: false,
-          hasLog: true,
-        };
-      } else {
-        // State 3: Editing existing log
-        newButtonStates = {
-          canClickBedtime: true, // Clickable when editing
-          canClickWakeup: true, // Clickable when editing
-          canClickLog: true, // Clickable for update
-          logButtonEnabled: true,
-          hasLog: true,
-        };
-      }
+      return {
+        canClickBedtime: true,
+        canClickWakeup: true,
+        canClickLog: isTimeChanged,
+        logButtonEnabled: isTimeChanged,
+        hasLog: true,
+        buttonText: "Update Sleep Log",
+      };
     }
+  }, [todayLog, scheduledBedtime, scheduledWakeup, isTimeChanged]);
 
-    // Cache the button states
-    globalSleepCache.buttonStates = newButtonStates;
-    globalSleepCache.todayHasSleepLog = newButtonStates.hasLog;
-
-    return newButtonStates;
-  }, [
-    sleepLogs,
-    realUserId,
-    scheduledBedtime,
-    scheduledWakeup,
-    isEditingSchedule,
-  ]);
-
-  // FIXED: Update todayHasSleepLog based on button states
   useEffect(() => {
     setTodayHasSleepLog(buttonStates.hasLog);
-    // Update cache
     globalSleepCache.todayHasSleepLog = buttonStates.hasLog;
   }, [buttonStates.hasLog]);
 
@@ -331,13 +315,19 @@ const SleepTrackerScreen = () => {
 
       console.log("✅ Raw data received:", data?.length || 0, "logs");
 
-      const validData = (data || []).filter((log) => {
-        if (!log || !log.duration) return false;
+      const seenKeys = new Set();
+      const validData = [];
+      (data || []).forEach((log) => {
+        if (!log || !log.duration) return;
         const mins = parseIntervalToMinutes(log.duration);
-        return mins > 0;
+        if (mins <= 0) return;
+        const key = log.id || `${getDateOnly(log.date)}_${log.user_id}`;
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+        validData.push(log);
       });
 
-      console.log("✅ Valid logs after filtering:", validData.length);
+      console.log("✅ Valid deduplicated logs:", validData.length);
 
       globalSleepCache.cachedData = validData;
       globalSleepCache.timestamp = Date.now();
@@ -469,10 +459,6 @@ const SleepTrackerScreen = () => {
   // Sleep logging workflow
   const handleLogSleep = useCallback(async () => {
     if (!realUserId || !buttonStates.logButtonEnabled) {
-      Alert.alert(
-        "Cannot Log Sleep",
-        "Please set your bedtime and wake up time first.",
-      );
       return;
     }
 
@@ -493,16 +479,31 @@ const SleepTrackerScreen = () => {
     }
 
     const dateStr = logDate.toISOString().slice(0, 10);
+    const todayStr = getTodayString();
 
     try {
       let error;
-      if (todayHasSleepLog) {
-        // Update existing log
-        const existingLog = sleepLogs.find(
-          (l) => getDateOnly(l.date) === dateStr && l.user_id === realUserId,
+      let realDbId = null;
+
+      // Check Supabase database first to prevent duplicate entries
+      const { data: dbExisting } = await supabase
+        .from("sleep_logs")
+        .select("*")
+        .eq("user_id", realUserId)
+        .eq("date", dateStr)
+        .maybeSingle();
+
+      const existingLog =
+        dbExisting ||
+        todayLog ||
+        sleepLogs.find(
+          (l) =>
+            (getDateOnly(l.date) === dateStr || getDateOnly(l.date) === todayStr) &&
+            l.user_id === realUserId,
         );
 
-        ({ error } = await supabase
+      if (existingLog && existingLog.id && !String(existingLog.id).startsWith("temp_")) {
+        const { data: updatedData, error: updateErr } = await supabase
           .from("sleep_logs")
           .update({
             start_time: scheduledBedtime,
@@ -512,28 +513,39 @@ const SleepTrackerScreen = () => {
             mood,
             sleep_goal: sleepGoal,
           })
-          .eq("id", existingLog.id));
+          .eq("id", existingLog.id)
+          .select()
+          .single();
+
+        error = updateErr;
+        if (updatedData) realDbId = updatedData.id;
       } else {
-        // Create new log
-        ({ error } = await supabase.from("sleep_logs").insert([
-          {
-            user_id: realUserId,
-            date: dateStr,
-            start_time: scheduledBedtime,
-            end_time: scheduledWakeup,
-            duration,
-            quality,
-            mood,
-            sleep_goal: sleepGoal,
-          },
-        ]));
+        const { data: insertedData, error: insertErr } = await supabase
+          .from("sleep_logs")
+          .insert([
+            {
+              user_id: realUserId,
+              date: dateStr,
+              start_time: scheduledBedtime,
+              end_time: scheduledWakeup,
+              duration,
+              quality,
+              mood,
+              sleep_goal: sleepGoal,
+            },
+          ])
+          .select()
+          .single();
+
+        error = insertErr;
+        if (insertedData) realDbId = insertedData.id;
       }
 
       if (error) throw error;
 
-      // Update cache optimistically
+      const targetId = realDbId || existingLog?.id;
       const newLog = {
-        id: `temp_${Date.now()}`,
+        id: targetId || `temp_${Date.now()}`,
         user_id: realUserId,
         date: dateStr,
         start_time: scheduledBedtime,
@@ -544,20 +556,30 @@ const SleepTrackerScreen = () => {
         sleep_goal: sleepGoal,
       };
 
-      if (todayHasSleepLog) {
-        const updatedLogs =
-          globalSleepCache.cachedData?.map((log) =>
-            getDateOnly(log.date) === dateStr && log.user_id === realUserId
-              ? { ...log, ...newLog }
-              : log,
-          ) || [];
-        globalSleepCache.cachedData = updatedLogs;
+      const currentList = globalSleepCache.cachedData || sleepLogs || [];
+      const matchIndex = currentList.findIndex(
+        (l) =>
+          (targetId && l.id === targetId) ||
+          ((getDateOnly(l.date) === dateStr || getDateOnly(l.date) === todayStr) &&
+            l.user_id === realUserId),
+      );
+
+      let updatedLogs;
+      if (matchIndex >= 0) {
+        updatedLogs = currentList.map((l, index) =>
+          index === matchIndex ? { ...l, ...newLog } : l,
+        );
       } else {
-        const updatedLogs = [newLog, ...(globalSleepCache.cachedData || [])];
-        globalSleepCache.cachedData = updatedLogs;
+        const cleanList = currentList.filter(
+          (l) =>
+            l.id !== newLog.id &&
+            !(getDateOnly(l.date) === dateStr && l.user_id === realUserId),
+        );
+        updatedLogs = [newLog, ...cleanList];
       }
 
-      setSleepLogs(globalSleepCache.cachedData);
+      globalSleepCache.cachedData = updatedLogs;
+      setSleepLogs(updatedLogs);
 
       // Update MainDashboard cache immediately
       try {
@@ -572,7 +594,6 @@ const SleepTrackerScreen = () => {
           mood,
           sleep_goal: sleepGoal,
         });
-        // Also invalidate to force refetch on next focus
         invalidateMainDashboardCache();
       } catch (cacheError) {
         console.log("Could not update MainDashboard cache:", cacheError);
@@ -580,11 +601,10 @@ const SleepTrackerScreen = () => {
 
       Alert.alert(
         "Success! 🌟",
-        todayHasSleepLog ? "Sleep log updated!" : "Sleep logged successfully!",
+        existingLog
+          ? "Sleep log updated successfully!"
+          : "Sleep logged successfully!",
       );
-
-      // Reset editing state after successful logging
-      setIsEditingSchedule(false);
 
       globalSleepCache.isStale = true;
       setRefreshTrigger((prev) => prev + 1);
@@ -596,12 +616,103 @@ const SleepTrackerScreen = () => {
     buttonStates.logButtonEnabled,
     scheduledBedtime,
     scheduledWakeup,
-    todayHasSleepLog,
+    todayLog,
     sleepLogs,
     quality,
     mood,
     sleepGoal,
   ]);
+
+  const handleDeleteLog = useCallback(
+    (logToDelete) => {
+      if (!logToDelete) return;
+
+      Alert.alert(
+        "Delete Sleep Log 🗑️",
+        "Are you sure you want to delete this sleep log?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const deletedDateStr = getDateOnly(logToDelete.date);
+                const isTempId = !logToDelete.id || String(logToDelete.id).startsWith("temp_");
+
+                let query = supabase.from("sleep_logs").delete();
+                if (realUserId) {
+                  query = query.eq("user_id", realUserId);
+                }
+                if (!isTempId) {
+                  query = query.eq("id", logToDelete.id);
+                } else {
+                  query = query.eq("date", deletedDateStr);
+                }
+
+                const { error } = await query;
+                if (error) throw error;
+
+                // Remove strictly ONLY the selected log
+                const updatedLogs = sleepLogs.filter(
+                  (l) => l.id !== logToDelete.id && (isTempId ? getDateOnly(l.date) !== deletedDateStr : true),
+                );
+
+                globalSleepCache.cachedData = updatedLogs;
+                globalSleepCache.timestamp = Date.now();
+                globalSleepCache.isStale = true;
+                setSleepLogs(updatedLogs);
+
+                // Check if any log remains for today
+                const todayStr = getTodayString();
+                const remainingTodayLog = updatedLogs.find(
+                  (l) => getDateOnly(l.date) === todayStr && l.user_id === realUserId,
+                );
+
+                if (!remainingTodayLog) {
+                  globalSleepCache.todayHasSleepLog = false;
+                  setTodayHasSleepLog(false);
+                }
+
+                // Sync MainDashboard cache
+                try {
+                  const {
+                    deleteMainDashboardSleepCache,
+                    updateMainDashboardSleepCache,
+                    invalidateMainDashboardCache,
+                  } = require("../utils/cacheManager");
+
+                  if (remainingTodayLog) {
+                    updateMainDashboardSleepCache({
+                      date: getDateOnly(remainingTodayLog.date),
+                      duration: remainingTodayLog.duration,
+                      quality: remainingTodayLog.quality,
+                      mood: remainingTodayLog.mood,
+                      sleep_goal: remainingTodayLog.sleep_goal,
+                    });
+                  } else {
+                    deleteMainDashboardSleepCache(deletedDateStr);
+                  }
+                  invalidateMainDashboardCache();
+                } catch (cacheErr) {
+                  console.log(
+                    "Error updating dashboard sleep cache:",
+                    cacheErr,
+                  );
+                }
+
+                Alert.alert("Success", "Sleep log deleted successfully.");
+              } catch (err) {
+                console.error("Error deleting sleep log:", err);
+                Alert.alert("Error", "Failed to delete sleep log.");
+              }
+            },
+          },
+        ],
+      );
+    },
+    [sleepLogs, realUserId],
+  );
 
   const handleSaveSleepGoal = useCallback(async () => {
     if (!realUserId) return;
@@ -627,53 +738,14 @@ const SleepTrackerScreen = () => {
 
   // Handle schedule button clicks
   const handleBedtimeClick = useCallback(() => {
-    console.log(
-      "🛏️ Bedtime clicked, canClickBedtime:",
-      buttonStates.canClickBedtime,
-    );
-    if (buttonStates.canClickBedtime) {
-      setShowBedtimePicker(true);
-    }
-  }, [buttonStates.canClickBedtime]);
+    setShowBedtimePicker(true);
+  }, []);
 
   const handleWakeupClick = useCallback(() => {
-    console.log(
-      "☀️ Wakeup clicked, canClickWakeup:",
-      buttonStates.canClickWakeup,
-    );
-    if (buttonStates.canClickWakeup) {
-      setShowWakeupPicker(true);
-    }
-  }, [buttonStates.canClickWakeup]);
-
-  // Handle edit button click
-  const handleEditSchedule = useCallback(() => {
-    console.log("✏️ Edit button clicked, current state:", isEditingSchedule);
-
-    if (todayHasSleepLog && !isEditingSchedule) {
-      // Load existing log data for editing
-      const todayStr = getTodayString();
-      const todayLog = sleepLogs.find(
-        (l) => getDateOnly(l.date) === todayStr && l.user_id === realUserId,
-      );
-
-      if (todayLog) {
-        setScheduledBedtime(todayLog.start_time);
-        setScheduledWakeup(todayLog.end_time);
-        setQuality(todayLog.quality || "Good");
-        setMood(todayLog.mood || "Relaxed");
-      }
-    }
-
-    setIsEditingSchedule(!isEditingSchedule);
-  }, [isEditingSchedule, todayHasSleepLog, sleepLogs, realUserId]);
+    setShowWakeupPicker(true);
+  }, []);
 
   // Calculations
-  const todayStr = getTodayString();
-  const todayLog = sleepLogs.find(
-    (l) => getDateOnly(l.date) === todayStr && l.user_id === realUserId,
-  );
-
   const todayDuration = todayLog?.duration
     ? parseIntervalToDisplay(todayLog.duration)
     : "No data";
@@ -948,16 +1020,6 @@ const SleepTrackerScreen = () => {
             <View style={styles.scheduleSection}>
               <View style={styles.scheduleHeader}>
                 <Text style={styles.scheduleTitle}>Set your schedule</Text>
-                {todayHasSleepLog && (
-                  <TouchableOpacity
-                    onPress={handleEditSchedule}
-                    style={styles.editButton}
-                  >
-                    <Text style={styles.editButtonText}>
-                      {isEditingSchedule ? "Done" : "Edit"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
               <View style={styles.scheduleContainer}>
@@ -1033,9 +1095,7 @@ const SleepTrackerScreen = () => {
                   styles.logSleepButtonTextEnabled,
               ]}
             >
-              {todayHasSleepLog && isEditingSchedule
-                ? "Update Sleep Log"
-                : "Log Your Sleep"}
+              {buttonStates.buttonText}
             </Text>
           </TouchableOpacity>
 
@@ -1043,14 +1103,16 @@ const SleepTrackerScreen = () => {
           <View style={styles.statusMessage}>
             <Text style={styles.statusText}>
               {(() => {
-                if (!scheduledBedtime || !scheduledWakeup) {
+                if (!todayLog) {
+                  if (buttonStates.logButtonEnabled) {
+                    return "Ready to log! Tap the button above.";
+                  }
                   return "Set your bedtime and wake up time above to enable sleep logging";
-                } else if (todayHasSleepLog && !isEditingSchedule) {
-                  return "Sleep already logged for today. Tap 'Edit' to make changes.";
-                } else if (buttonStates.logButtonEnabled) {
-                  return "Ready to log! Tap the button above.";
                 } else {
-                  return "Set both bedtime and wake up time to enable logging";
+                  if (isTimeChanged) {
+                    return "Time changed! Tap 'Update Sleep Log' to save changes.";
+                  }
+                  return "Sleep logged for today. Tap Bedtime or Wake Up above to change times.";
                 }
               })()}
             </Text>
@@ -1162,12 +1224,12 @@ const SleepTrackerScreen = () => {
                 <TouchableOpacity
                   style={styles.logCard}
                   onPress={() => {
-                    setScheduledBedtime(log.start_time);
-                    setScheduledWakeup(log.end_time);
-                    setQuality(log.quality || "Good");
-                    setMood(log.mood || "Relaxed");
-                    setIsEditingSchedule(true);
+                    if (log.start_time) setScheduledBedtime(log.start_time);
+                    if (log.end_time) setScheduledWakeup(log.end_time);
+                    if (log.quality) setQuality(log.quality);
+                    if (log.mood) setMood(log.mood);
                   }}
+                  onLongPress={() => handleDeleteLog(log)}
                   activeOpacity={0.85}
                 >
                   <View style={styles.logCardIconShell}>
@@ -1217,7 +1279,10 @@ const SleepTrackerScreen = () => {
               return (
                 <View style={styles.logCardList}>
                   {recentLogs.map((log, idx) => (
-                    <LogItem key={log.id} log={log} />
+                    <LogItem
+                      key={log.id ? `${log.id}_${idx}` : `log_${idx}`}
+                      log={log}
+                    />
                   ))}
                 </View>
               );
@@ -1237,8 +1302,11 @@ const SleepTrackerScreen = () => {
                               {month.monthName}
                             </Text>
                             <View style={styles.logCardList}>
-                              {month.logs.map((log) => (
-                                <LogItem key={log.id} log={log} />
+                              {month.logs.map((log, i) => (
+                                <LogItem
+                                  key={log.id ? `${log.id}_${i}` : `log_${i}`}
+                                  log={log}
+                                />
                               ))}
                             </View>
                           </>
@@ -1282,8 +1350,11 @@ const SleepTrackerScreen = () => {
 
                             {isExpanded && (
                               <View style={styles.logCardList}>
-                                {month.logs.map((log) => (
-                                  <LogItem key={log.id} log={log} />
+                                {month.logs.map((log, i) => (
+                                  <LogItem
+                                    key={log.id ? `${log.id}_${i}` : `log_${i}`}
+                                    log={log}
+                                  />
                                 ))}
                               </View>
                             )}
