@@ -194,20 +194,6 @@ const FooterBar = ({
       route: "Home",
     },
     {
-      key: "Workout",
-      label: "Saved",
-      icon: (
-        <Ionicons
-          name="fast-food-outline"
-          size={22}
-          color={
-            activeTab === "Workout" ? palette.primary : palette.navInactive
-          }
-        />
-      ),
-      route: "SavedMealsScreen",
-    },
-    {
       key: "Profile",
       label: "Profile",
       icon: (

@@ -73,12 +73,11 @@ const JournalScreen = () => {
   const [timelineDays, setTimelineDays] = useState([]); // [{dateLabel, entries:{meals,workouts,sleep,hydration,weight}}]
   const [rangeFilter, setRangeFilter] = useState("today"); // 'today' | '7days' | '1month'
 
-  const filters = ["All", "Meals", "Workouts", "Sleep", "Hydration", "Weight"];
+  const filters = ["All", "Meals", "Sleep", "Hydration", "Weight"];
 
   const categoryConfigs = useMemo(
     () => [
       { key: "meal", dataKey: "meals", label: "Meals" },
-      { key: "workout", dataKey: "workouts", label: "Workouts" },
       { key: "sleep", dataKey: "sleep", label: "Sleep" },
       { key: "hydration", dataKey: "hydration", label: "Hydration" },
       { key: "weight", dataKey: "weight", label: "Weight" },
@@ -815,7 +814,7 @@ const JournalScreen = () => {
           <View style={styles.heroSpacer} />
         </View>
         <Text style={styles.heroSubtitle}>
-          Meals, workouts, sleep and more — all in one place.
+          Meals, sleep, hydration and more — all in one place.
         </Text>
       </View>
 
@@ -891,7 +890,7 @@ const JournalScreen = () => {
               />
               <Text style={styles.emptyStateTitle}>Nothing logged yet</Text>
               <Text style={styles.emptyStateText}>
-                Entries you log for meals, workouts, sleep, hydration and weight
+                Entries you log for meals, sleep, hydration and weight
                 will show up here.
               </Text>
             </View>
