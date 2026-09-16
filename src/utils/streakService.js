@@ -133,163 +133,192 @@ async function getDayCalories(userId, dateStr) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core: evaluate yesterday's streak progress (lazy, called on app open)
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Evaluates yesterday's calorie goal completion and updates the streak.
- * Should be called once per day, on next-day app open.
- *
- * @param {string} userId
- * @param {number} calorieGoal  - the user's daily calorie goal (calculated)
- * @param {string} goalType     - 'lose' | 'gain' | 'maintain'
- * @returns {Object|null}       - updated streak data
+ * Evaluates food streak including today's real-time progress.
+ * If today's calorie goal is hit, streak increases TODAY (e.g. from 1 to 2).
+ * If today's goal is not hit yet, today is in progress (doesn't break streak, streak shows count up to yesterday).
  */
-export async function evaluateYesterdayStreak(userId, calorieGoal, goalType = 'maintain') {
+export async function evaluateAndGetFoodStreak(userId, calorieGoal, goalType) {
+  if (!userId) return { streak: 0, maxStreak: 0, graceActive: false };
+
   try {
-    const streakData = await getUserStreaks(userId);
-    if (!streakData) return null;
+    let effectiveGoal = calorieGoal;
+    let effectiveType = goalType;
+
+    if (!effectiveGoal || !effectiveType) {
+      const { data: profile } = await supabase
+        .from('user_profile')
+        .select('calorie_goal, goal_focus')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile) {
+        if (!effectiveGoal && profile.calorie_goal) effectiveGoal = profile.calorie_goal;
+        if (!effectiveType && profile.goal_focus) effectiveType = profile.goal_focus;
+      }
+    }
+
+    effectiveGoal = Number(effectiveGoal) || 2000;
+    effectiveType = (effectiveType || 'maintain').toLowerCase();
+    if (effectiveType.includes('lose')) effectiveType = 'lose';
+    else if (effectiveType.includes('gain')) effectiveType = 'gain';
+    else effectiveType = 'maintain';
+
+    const threshold = GOAL_THRESHOLDS[effectiveType] ?? GOAL_THRESHOLDS.maintain;
+    const targetCalories = effectiveGoal * threshold;
 
     const today = todayStr();
-    const yesterday = yesterdayStr();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 60);
+    const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
 
-    // Already evaluated today — skip to avoid double-processing
-    if (streakData.food_goal_evaluated_date === today) {
-      console.log('✅ Streak already evaluated today, skipping.');
-      return streakData;
-    }
-
-    // Get yesterday's total calories
-    const yesterdayCalories = await getDayCalories(userId, yesterday);
-
-    // Determine threshold based on goal type
-    const normalizedGoal = (goalType || 'maintain').toLowerCase();
-    const threshold = GOAL_THRESHOLDS[normalizedGoal] ?? GOAL_THRESHOLDS.maintain;
-    const goalReached = calorieGoal > 0 && yesterdayCalories >= calorieGoal * threshold;
-
-    console.log(
-      `📊 Yesterday (${yesterday}): ${Math.round(yesterdayCalories)} kcal / goal ${calorieGoal} (${Math.round(threshold * 100)}% threshold) → ${goalReached ? '✅ Hit' : '❌ Missed'}`
-    );
-
-    let newStreak = streakData.food_streak;
-    let newGraceUsed = streakData.food_grace_used ?? false;
-    let newLastGoalDate = streakData.food_last_goal_date;
-
-    if (goalReached) {
-      // ─── Goal was hit yesterday ───────────────────────────────────────────
-      const lastGoalDate = streakData.food_last_goal_date;
-
-      if (!lastGoalDate) {
-        // No previous streak — start fresh at 1
-        newStreak = 1;
-      } else {
-        const daysSinceLastGoal = daysBetween(lastGoalDate, yesterday);
-
-        if (daysSinceLastGoal === 1) {
-          // Perfect consecutive day
-          newStreak += 1;
-        } else if (daysSinceLastGoal === 2 && newGraceUsed) {
-          // Grace was protecting us for the gap day — continue streak
-          newStreak += 1;
-        } else {
-          // Gap too large or unexpected — restart
-          newStreak = 1;
-        }
-      }
-
-      newGraceUsed = false; // Grace resets after a successful day
-      newLastGoalDate = yesterday;
-
-    } else {
-      // ─── Goal was missed yesterday ────────────────────────────────────────
-      if (!newGraceUsed && newStreak > 0) {
-        // First missed day — activate grace (streak holds, show ❄️)
-        newGraceUsed = true;
-        console.log(`❄️ Grace activated — streak ${newStreak} protected for one day.`);
-      } else if (newGraceUsed || newStreak === 0) {
-        // Grace was already used (second consecutive miss) — reset
-        console.log(`💔 Streak broken (was ${newStreak}), resetting to 0.`);
-        newStreak = 0;
-        newGraceUsed = false;
-        newLastGoalDate = null;
-      }
-    }
-
-    const newMaxStreak = Math.max(newStreak, streakData.food_max_streak ?? 0);
-
-    const { data: updated, error } = await supabase
-      .from('streaks')
-      .update({
-        food_streak: newStreak,
-        food_max_streak: newMaxStreak,
-        food_last_goal_date: newLastGoalDate,
-        food_goal_evaluated_date: today,
-        food_grace_used: newGraceUsed,
-        updated_at: new Date().toISOString(),
-      })
+    const { data: foodLogs, error } = await supabase
+      .from('user_food_logs')
+      .select('created_at, calories, date')
       .eq('user_id', userId)
-      .select()
-      .single();
+      .gte('created_at', `${startDateStr}T00:00:00`);
 
     if (error) {
-      console.error('Error updating streak after evaluation:', error);
-      return null;
+      console.error('Error fetching food logs for streak calculation:', error);
     }
 
-    console.log(
-      `✅ Streak updated: ${newStreak} (max: ${newMaxStreak}, grace: ${newGraceUsed})`
-    );
-    return updated;
-  } catch (err) {
-    console.error('Error in evaluateYesterdayStreak:', err);
-    return null;
-  }
-}
+    const calsByDate = {};
+    (foodLogs || []).forEach((log) => {
+      let dateKey = log.date;
+      if (!dateKey && log.created_at) {
+        dateKey = log.created_at.split('T')[0];
+      }
+      if (dateKey) {
+        calsByDate[dateKey] = (calsByDate[dateKey] || 0) + (log.calories || 0);
+      }
+    });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public: get current streak info for UI
-// ─────────────────────────────────────────────────────────────────────────────
+    const getDateOffset = (offset) => {
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
 
-/**
- * Returns an object with:
- *   streak       {number}  - current streak count
- *   maxStreak    {number}  - all-time best streak
- *   graceActive  {boolean} - true when ❄️ grace day is protecting the streak
- */
-export async function getFoodStreak(userId) {
-  try {
-    const streakData = await getUserStreaks(userId);
-    if (!streakData) return { streak: 0, maxStreak: 0, graceActive: false };
+    const isGoalHit = (dateStr) => {
+      const cals = calsByDate[dateStr] || 0;
+      return targetCalories > 0 && cals >= targetCalories;
+    };
+
+    const todayDateStr = today;
+    const yesterdayDateStr = getDateOffset(1);
+
+    const todayHit = isGoalHit(todayDateStr);
+
+    let streak = 0;
+    let graceActive = false;
+    let lastGoalDate = null;
+
+    if (todayHit) {
+      // ── TODAY'S GOAL IS HIT TODAY ──
+      streak = 1;
+      lastGoalDate = todayDateStr;
+      let checkOffset = 1;
+      let usedGraceInSequence = false;
+
+      while (checkOffset <= 60) {
+        const dateStr = getDateOffset(checkOffset);
+        if (isGoalHit(dateStr)) {
+          streak++;
+          checkOffset++;
+        } else {
+          const prevDateStr = getDateOffset(checkOffset + 1);
+          if (!usedGraceInSequence && isGoalHit(prevDateStr)) {
+            usedGraceInSequence = true;
+            checkOffset++;
+          } else {
+            break;
+          }
+        }
+      }
+    } else {
+      // ── TODAY'S GOAL IS NOT HIT YET (IN PROGRESS) ──
+      const yesterdayHit = isGoalHit(yesterdayDateStr);
+
+      if (yesterdayHit) {
+        streak = 1;
+        lastGoalDate = yesterdayDateStr;
+        let checkOffset = 2;
+        let usedGraceInSequence = false;
+
+        while (checkOffset <= 60) {
+          const dateStr = getDateOffset(checkOffset);
+          if (isGoalHit(dateStr)) {
+            streak++;
+            checkOffset++;
+          } else {
+            const prevDateStr = getDateOffset(checkOffset + 1);
+            if (!usedGraceInSequence && isGoalHit(prevDateStr)) {
+              usedGraceInSequence = true;
+              checkOffset++;
+            } else {
+              break;
+            }
+          }
+        }
+      } else {
+        const dayBeforeYesterdayStr = getDateOffset(2);
+        if (isGoalHit(dayBeforeYesterdayStr)) {
+          graceActive = true;
+          streak = 1;
+          lastGoalDate = dayBeforeYesterdayStr;
+          let checkOffset = 3;
+
+          while (checkOffset <= 60) {
+            const dateStr = getDateOffset(checkOffset);
+            if (isGoalHit(dateStr)) {
+              streak++;
+              checkOffset++;
+            } else {
+              break;
+            }
+          }
+        } else {
+          streak = 0;
+          graceActive = false;
+        }
+      }
+    }
+
+    const existingStreakRecord = await getUserStreaks(userId);
+    const maxStreak = Math.max(streak, existingStreakRecord?.food_max_streak ?? 0);
+
+    await supabase
+      .from('streaks')
+      .update({
+        food_streak: streak,
+        food_max_streak: maxStreak,
+        food_last_goal_date: lastGoalDate,
+        food_goal_evaluated_date: today,
+        food_grace_used: graceActive,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
 
     return {
-      streak: streakData.food_streak ?? 0,
-      maxStreak: streakData.food_max_streak ?? 0,
-      graceActive: streakData.food_grace_used ?? false,
+      streak,
+      maxStreak,
+      graceActive,
     };
   } catch (err) {
-    console.error('Error in getFoodStreak:', err);
+    console.error('Error in evaluateAndGetFoodStreak:', err);
     return { streak: 0, maxStreak: 0, graceActive: false };
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Streak-at-risk warning helper (for HomeScreen)
-// ─────────────────────────────────────────────────────────────────────────────
+export async function evaluateYesterdayStreak(userId, calorieGoal, goalType = 'maintain') {
+  return await evaluateAndGetFoodStreak(userId, calorieGoal, goalType);
+}
 
-/**
- * Returns how many more kcal the user needs to log TODAY to keep their streak.
- * Returns 0 if goal already reached, or null if there's no active streak to protect.
- *
- * @param {number} currentCalories  - today's logged calories so far
- * @param {number} calorieGoal      - user's daily calorie goal
- * @param {string} goalType         - 'lose' | 'gain' | 'maintain'
- * @param {number} currentStreak    - current streak count
- * @param {boolean} graceActive     - whether grace day is active
- * @returns {number|null}
- */
+export async function getFoodStreak(userId, calorieGoal, goalType) {
+  return await evaluateAndGetFoodStreak(userId, calorieGoal, goalType);
+}
+
 export function getStreakRiskCalories(currentCalories, calorieGoal, goalType, currentStreak, graceActive) {
-  // No streak to protect
   if (currentStreak === 0 && !graceActive) return null;
 
   const normalizedGoal = (goalType || 'maintain').toLowerCase();
@@ -300,136 +329,12 @@ export function getStreakRiskCalories(currentCalories, calorieGoal, goalType, cu
   return remaining > 0 ? remaining : 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Legacy compatibility shims (used in HomeScreen on food log save/delete)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Called when a food log is saved. In the new system, we don't update the
- * streak on every log — evaluation happens lazily on next-day app open.
- * This function is kept for backward compatibility but is now a no-op for streak.
- * It DOES trigger evaluateYesterdayStreak if today hasn't been evaluated yet,
- * which covers the case where the user first opens the app after midnight.
- *
- * Pass calorieGoal and goalType from the HomeScreen context.
- */
 export async function updateFoodStreak(userId, calorieGoal, goalType) {
-  // evaluateYesterdayStreak is idempotent (checks food_goal_evaluated_date)
-  // so it's safe to call here — it will no-op if already done today.
-  if (calorieGoal && userId) {
-    return evaluateYesterdayStreak(userId, calorieGoal, goalType);
-  }
-  return null;
+  return await evaluateAndGetFoodStreak(userId, calorieGoal, goalType);
 }
 
-/**
- * Recalculate food streak from scratch by walking through all food log dates.
- * Now goal-based: checks each past day's calories against the goal.
- * Called after deleting food logs.
- */
 export async function recalculateFoodStreak(userId, calorieGoal, goalType = 'maintain') {
-  try {
-    console.log('🔄 Recalculating goal-based food streak from database...');
-
-    const normalizedGoal = (goalType || 'maintain').toLowerCase();
-    const threshold = GOAL_THRESHOLDS[normalizedGoal] ?? GOAL_THRESHOLDS.maintain;
-    const today = todayStr();
-    const yesterday = yesterdayStr();
-
-    // Fetch all food logs grouped by date (excluding today — today's not done yet)
-    const { data: logs, error } = await supabase
-      .from('user_food_logs')
-      .select('created_at, calories')
-      .eq('user_id', userId)
-      .lt('created_at', `${today}T00:00:00`)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching logs for recalculation:', error);
-      return null;
-    }
-
-    if (!logs || logs.length === 0) {
-      await supabase.from('streaks').update({
-        food_streak: 0,
-        food_max_streak: 0,
-        food_last_goal_date: null,
-        food_goal_evaluated_date: today,
-        food_grace_used: false,
-        updated_at: new Date().toISOString(),
-      }).eq('user_id', userId);
-      console.log('✅ Streak recalculated: 0 (no logs)');
-      return await getUserStreaks(userId);
-    }
-
-    // Aggregate calories per day
-    const calsByDay = {};
-    for (const log of logs) {
-      const dateStr = log.created_at.split('T')[0];
-      calsByDay[dateStr] = (calsByDay[dateStr] || 0) + (log.calories || 0);
-    }
-
-    // Walk backwards from yesterday to find current streak
-    const sortedDays = Object.keys(calsByDay).sort().reverse(); // newest first
-    let currentStreak = 0;
-    let graceUsed = false;
-    let lastGoalDate = null;
-    let expectDate = yesterday;
-
-    for (const day of sortedDays) {
-      const diff = daysBetween(day, expectDate);
-      const hit = calorieGoal > 0 && calsByDay[day] >= calorieGoal * threshold;
-
-      if (diff === 0) {
-        // This is the expected date
-        if (hit) {
-          currentStreak++;
-          lastGoalDate = lastGoalDate || day;
-          expectDate = new Date(new Date(day).getTime() - 86400000)
-            .toISOString().split('T')[0];
-        } else {
-          if (!graceUsed && currentStreak > 0) {
-            graceUsed = true; // use grace for this gap
-            expectDate = new Date(new Date(day).getTime() - 86400000)
-              .toISOString().split('T')[0];
-          } else {
-            break; // streak broken
-          }
-        }
-      } else if (diff === 1 && !graceUsed) {
-        // One day gap — use grace
-        if (hit) {
-          graceUsed = true;
-          currentStreak++;
-          lastGoalDate = lastGoalDate || day;
-          expectDate = new Date(new Date(day).getTime() - 86400000)
-            .toISOString().split('T')[0];
-        } else {
-          break;
-        }
-      } else {
-        break; // gap too large
-      }
-    }
-
-    const streakData = await getUserStreaks(userId);
-    const newMax = Math.max(currentStreak, streakData?.food_max_streak ?? 0);
-
-    await supabase.from('streaks').update({
-      food_streak: currentStreak,
-      food_max_streak: newMax,
-      food_last_goal_date: lastGoalDate,
-      food_goal_evaluated_date: today,
-      food_grace_used: graceUsed,
-      updated_at: new Date().toISOString(),
-    }).eq('user_id', userId);
-
-    console.log(`✅ Streak recalculated: ${currentStreak} (grace: ${graceUsed})`);
-    return await getUserStreaks(userId);
-  } catch (err) {
-    console.error('Error in recalculateFoodStreak:', err);
-    return null;
-  }
+  return await evaluateAndGetFoodStreak(userId, calorieGoal, goalType);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

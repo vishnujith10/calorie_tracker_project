@@ -37,6 +37,7 @@ import {
 } from "../utils/cacheManager";
 import { getTodayCaloriesBurned } from "../utils/calorieCalculator";
 import {
+    evaluateAndGetFoodStreak,
     evaluateYesterdayStreak,
     getFoodStreak,
     getStreakRiskCalories,
@@ -772,20 +773,8 @@ const HomeScreen = ({ navigation }) => {
         fetchCaloriesBurned();
         const loadStreak = async () => {
           try {
-            const streakNow = Date.now();
-            const streakTimeSinceLastFetch = streakNow - streakCache.lastFetch;
-
-            if (
-              streakCache.cachedStreak !== null &&
-              streakTimeSinceLastFetch < streakCache.CACHE_DURATION
-            ) {
-              applyStreakResult(streakCache.cachedStreak);
-              return;
-            }
-
-            // Evaluate yesterday lazily (idempotent — skips if already done today)
-            await evaluateYesterdayStreak(user.id, dailyGoal, goal_type);
-            const result = await getFoodStreak(user.id);
+            if (!user.id) return;
+            const result = await evaluateAndGetFoodStreak(user.id, dailyGoal, goal_type);
             applyStreakResult(result);
           } catch (error) {
             console.error('Error loading streak:', error);
@@ -820,20 +809,8 @@ const HomeScreen = ({ navigation }) => {
 
       const loadStreak = async () => {
         try {
-          const streakNow = Date.now();
-          const streakTimeSinceLastFetch = streakNow - streakCache.lastFetch;
-
-          if (
-            streakCache.cachedStreak !== null &&
-            streakTimeSinceLastFetch < streakCache.CACHE_DURATION
-          ) {
-            applyStreakResult(streakCache.cachedStreak);
-            return;
-          }
-
-          // Evaluate yesterday lazily (idempotent — skips if already done today)
-          await evaluateYesterdayStreak(user.id, dailyGoal, goal_type);
-          const result = await getFoodStreak(user.id);
+          if (!user.id) return;
+          const result = await evaluateAndGetFoodStreak(user.id, dailyGoal, goal_type);
           applyStreakResult(result);
         } catch (error) {
           console.error('Error loading streak:', error);

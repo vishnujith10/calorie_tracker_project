@@ -30,7 +30,7 @@ import {
   invalidateMainDashboardCache,
   updateMainDashboardCacheOptimistic,
 } from "../utils/cacheManager";
-import { getFoodStreak } from "../utils/streakService";
+import { evaluateAndGetFoodStreak, getFoodStreak } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
 
 const globalCache = getMainDashboardCache();
@@ -867,20 +867,9 @@ const MainDashboardScreen = ({ route }) => {
     React.useCallback(() => {
       if (!realUserId) return;
 
-      const now = Date.now();
-      const timeSinceLastFetch = now - streakCache.lastFetch;
-      const cacheExpired =
-        !streakCache.cachedStreak ||
-        timeSinceLastFetch >= streakCache.CACHE_DURATION;
-
-      if (!cacheExpired) {
-        applyStreakResult(streakCache.cachedStreak);
-        return;
-      }
-
       const loadStreak = async () => {
         try {
-          const result = await getFoodStreak(realUserId);
+          const result = await evaluateAndGetFoodStreak(realUserId);
           applyStreakResult(result);
         } catch (error) {
           console.error('Error loading streak:', error);
