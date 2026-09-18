@@ -30,15 +30,15 @@ const WelcomeScreen = () => {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'flex-start',
-      paddingTop: Math.max(64, SCREEN_HEIGHT * 0.09),
+      paddingTop: Platform.OS === 'ios' ? 32 : 44,
       paddingHorizontal: 28,
     },
 
-    // Single Square Logo Container + Badge (brought ~10% lower)
+    // Single Square Logo Container + Badge
     cardWrapper: {
       position: 'relative',
       alignItems: 'center',
-      marginBottom: Math.max(20, SCREEN_HEIGHT * 0.035),
+      marginBottom: 32,
     },
 
     // Single Square Logo Container
@@ -99,9 +99,9 @@ const WelcomeScreen = () => {
       color: '#163633',
     },
 
-    // Title (shifted 25% lower)
+    // Title
     title: {
-      marginTop: Math.max(48, SCREEN_HEIGHT * 0.065),
+      marginTop: Math.round(SCREEN_HEIGHT * 0.08),
       fontFamily: 'Lexend-Bold',
       fontSize: 32,
       lineHeight: 40,
@@ -113,7 +113,7 @@ const WelcomeScreen = () => {
 
     // Description
     description: {
-      marginTop: 12,
+      marginTop: 14,
       maxWidth: 320,
       fontFamily: 'Lexend-Regular',
       fontSize: 15,
@@ -244,4 +244,4 @@ const WelcomeScreen = () => {
   );
 };
 
-export default WelcomeScreen;
+export default WelcomeScreen; 
