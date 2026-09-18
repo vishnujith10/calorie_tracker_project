@@ -163,6 +163,7 @@ const FooterBar = ({ navigation, activeTab }) => {
       ),
       route: "Home",
     },
+   
     {
       key: "Profile",
       label: "Profile",

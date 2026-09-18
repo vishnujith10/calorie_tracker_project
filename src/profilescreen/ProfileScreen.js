@@ -67,6 +67,7 @@ const FooterBar = ({ navigation, activeTab, palette, isDark }) => {
       ),
       route: "Home",
     },
+    
     {
       key: "Profile",
       label: "Profile",
