@@ -208,6 +208,20 @@ const FooterBar = ({
       route: "SavedMealsScreen",
     },
     {
+      key: "Summary",
+      label: "Summary",
+      icon: (
+        <Ionicons
+          name="analytics-outline"
+          size={22}
+          color={
+            activeTab === "Summary" ? palette.primary : palette.navInactive
+          }
+        />
+      ),
+      route: "SummaryScreen",
+    },
+    {
       key: "Profile",
       label: "Profile",
       icon: (

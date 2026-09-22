@@ -229,9 +229,9 @@ const WelcomeScreen = () => {
 
         {/* New user? Register */}
         <View style={dynamicStyles.secondaryRow}>
-          <Text style={dynamicStyles.secondaryText}>New user? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('MiniProfile')}>
-            <Text style={dynamicStyles.registerLink}>Register</Text>
+          <Text style={dynamicStyles.secondaryText}>Already have an account ? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={dynamicStyles.registerLink}>Login</Text>
           </TouchableOpacity>
         </View>
 

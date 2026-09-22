@@ -163,7 +163,14 @@ const FooterBar = ({ navigation, activeTab }) => {
       ),
       route: "Home",
     },
-   
+    {
+      key: "Summary",
+      label: "Summary",
+      icon: (
+        <Ionicons name="analytics-outline" size={22} color={inactiveColor} />
+      ),
+      route: "SummaryScreen",
+    },
     {
       key: "Profile",
       label: "Profile",

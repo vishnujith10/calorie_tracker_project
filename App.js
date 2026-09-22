@@ -55,6 +55,7 @@ import AddWeightScreen from "./src/weightscreen/AddWeightScreen";
 import WeightTrackerScreen from "./src/weightscreen/WeightTrackerScreen";
 import WelcomeScreen from "./src/welcomescreen/WelcomeScreen";
 import AICoachScreen from "./src/screens/AICoachScreen";
+import SummaryScreen from "./src/summaryscreen/SummaryScreen";
 
 if (typeof global.structuredClone !== "function") {
   global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
@@ -369,6 +370,15 @@ export default function App() {
                     <Stack.Screen
                       name="AppSettings"
                       component={AppSettingsScreen}
+                    />
+                    <Stack.Screen
+                      name="SummaryScreen"
+                      component={SummaryScreen}
+                      options={{
+                        headerShown: false,
+                        animation: "slide_from_right",
+                        gestureDirection: "horizontal",
+                      }}
                     />
                     <Stack.Screen
                       name="MiniProfile"
