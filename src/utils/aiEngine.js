@@ -30,7 +30,7 @@ const extractJSON = (text) => {
 
 /**
  * Fast detection of food item names from an image.
- * Uses gemini-2.0-flash for speed.
+ * Uses gemini-3.6-flash for speed.
  * @param {string} photoUri Local URI of the photo
  * @returns {Promise<Array>} Array of item objects
  */

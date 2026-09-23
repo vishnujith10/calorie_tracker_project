@@ -3,27 +3,27 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
 import React, {
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import {
-    Alert,
-    BackHandler,
-    Dimensions,
-    Image,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  BackHandler,
+  Dimensions,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { OnboardingContext } from "../context/OnboardingContext";
@@ -31,21 +31,20 @@ import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 import { createFoodLog, deleteFoodLog, getFoodLogs } from "../utils/api";
 import {
-    getHomeScreenCache,
-    invalidateHomeScreenCache,
-    updateHomeScreenCacheOptimistic,
+  getHomeScreenCache,
+  invalidateHomeScreenCache,
+  updateHomeScreenCacheOptimistic,
 } from "../utils/cacheManager";
 import { getTodayCaloriesBurned } from "../utils/calorieCalculator";
+import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 import {
-    evaluateAndGetFoodStreak,
-    evaluateYesterdayStreak,
-    getFoodStreak,
-    getStreakRiskCalories,
-    recalculateFoodStreak,
-    updateFoodStreak,
+  evaluateAndGetFoodStreak,
+  getFoodStreak,
+  getStreakRiskCalories,
+  recalculateFoodStreak,
+  updateFoodStreak
 } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
-import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 
 const screenWidth = Dimensions.get("window").width;
 const globalHomeCache = getHomeScreenCache();
@@ -73,8 +72,8 @@ export const userNameCache = {
 };
 
 export {
-    invalidateHomeScreenCache,
-    updateHomeScreenCacheOptimistic as updateHomeScreenCache
+  invalidateHomeScreenCache,
+  updateHomeScreenCacheOptimistic as updateHomeScreenCache
 };
 
 const HomeHeader = React.memo(
@@ -207,20 +206,7 @@ const FooterBar = ({
       ),
       route: "SavedMealsScreen",
     },
-    {
-      key: "Summary",
-      label: "Summary",
-      icon: (
-        <Ionicons
-          name="analytics-outline"
-          size={22}
-          color={
-            activeTab === "Summary" ? palette.primary : palette.navInactive
-          }
-        />
-      ),
-      route: "SummaryScreen",
-    },
+   
     {
       key: "Profile",
       label: "Profile",
