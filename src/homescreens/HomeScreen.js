@@ -29,7 +29,7 @@ import {
 import { OnboardingContext } from "../context/OnboardingContext";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
-import { createFoodLog, deleteFoodLog, getFoodLogs } from "../utils/api";
+import { createFoodLog, deleteFoodLog, getFoodLogs, resolveMealPhotoUrl } from "../utils/api";
 import {
   getHomeScreenCache,
   invalidateHomeScreenCache,
@@ -143,10 +143,17 @@ const StreakBadge = React.memo(
         graceActive && styles.streakBadgeGrace,
       ]}>
         <Text style={styles.streakEmoji}>{emoji}</Text>
-        <Text style={styles.streakText}>{label}</Text>
-        {maxStreak > 0 && (
-          <Text style={styles.streakMaxText}> · Best {maxStreak}</Text>
-        )}
+        <Text
+          style={styles.streakText}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {label}
+          {maxStreak > 0 && (
+            <Text style={styles.streakMaxText}> · Best {maxStreak}</Text>
+          )}
+        </Text>
       </View>
     );
   },
@@ -538,15 +545,40 @@ const HomeScreen = ({ navigation }) => {
   const [calorieStreak, setCalorieStreak] = useState(() => {
     const now = Date.now();
     if (
+      streakCache &&
       streakCache.cachedStreak !== null &&
       now - streakCache.lastFetch < streakCache.CACHE_DURATION
     ) {
-      return streakCache.cachedStreak?.streak ?? streakCache.cachedStreak ?? 0;
+      return typeof streakCache.cachedStreak === 'object'
+        ? (streakCache.cachedStreak?.streak ?? 0)
+        : (streakCache.cachedStreak ?? 0);
     }
     return 0;
   });
-  const [graceActive, setGraceActive] = useState(false);
-  const [maxStreak, setMaxStreak] = useState(0);
+  const [graceActive, setGraceActive] = useState(() => {
+    const now = Date.now();
+    if (
+      streakCache &&
+      streakCache.cachedStreak !== null &&
+      typeof streakCache.cachedStreak === 'object' &&
+      now - streakCache.lastFetch < streakCache.CACHE_DURATION
+    ) {
+      return streakCache.cachedStreak?.graceActive ?? false;
+    }
+    return false;
+  });
+  const [maxStreak, setMaxStreak] = useState(() => {
+    const now = Date.now();
+    if (
+      streakCache &&
+      streakCache.cachedStreak !== null &&
+      typeof streakCache.cachedStreak === 'object' &&
+      now - streakCache.lastFetch < streakCache.CACHE_DURATION
+    ) {
+      return streakCache.cachedStreak?.maxStreak ?? 0;
+    }
+    return 0;
+  });
 
   const calorieStreakRef = React.useRef(calorieStreak);
   React.useEffect(() => {
@@ -918,15 +950,27 @@ const HomeScreen = ({ navigation }) => {
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
+      const targetDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
       const filteredLogs = logs.filter((log) => {
-        const logDate = new Date(log.created_at);
-        return logDate >= startOfDay && logDate <= endOfDay;
+        if (log.date_time) {
+          const logDateOnly = String(log.date_time).slice(0, 10);
+          if (logDateOnly === targetDateStr) return true;
+        }
+        if (log.created_at) {
+          const logDate = new Date(log.created_at);
+          return logDate >= startOfDay && logDate <= endOfDay;
+        }
+        return false;
       });
 
-      setFoodLogs(filteredLogs);
+      const withUrls = await Promise.all(
+        filteredLogs.map((meal) => resolveMealPhotoUrl(meal))
+      );
 
-      const newTotals = filteredLogs.reduce(
+      setFoodLogs(withUrls);
+
+      const newTotals = withUrls.reduce(
         (acc, log) => {
           acc.calories += log.calories || 0;
           acc.protein += log.protein || 0;
@@ -939,27 +983,11 @@ const HomeScreen = ({ navigation }) => {
       );
       setTotals(newTotals);
 
-      const recent = filteredLogs.slice(-5).reverse();
-      const withUrls = await Promise.all(
-        recent.map(async (meal) => {
-          if (meal.photo_url && !meal.photo_url.startsWith("http") && !meal.photo_url.startsWith("file://")) {
-            try {
-              const { data } = await supabase.storage
-                .from("food-photos")
-                .createSignedUrl(meal.photo_url, 60 * 60);
-              return { ...meal, photo_url: data?.signedUrl || meal.photo_url };
-            } catch {
-              return meal;
-            }
-          }
-          return meal;
-        }),
-      );
       setRecentMeals(withUrls);
 
       const generatedInsights = generateCalorieInsights({
         foodLogs: logs || [],
-        todayLogs: filteredLogs || [],
+        todayLogs: withUrls || [],
         calorie_goal: onboardingData?.daily_calorie_goal || dailyGoal || 2000,
         currentCalories: newTotals.calories,
         macro_targets,
@@ -967,7 +995,7 @@ const HomeScreen = ({ navigation }) => {
       setCalorieInsights(generatedInsights);
 
       globalHomeCache.cachedData = {
-        foodLogs: filteredLogs,
+        foodLogs: withUrls,
         totals: newTotals,
         recentMeals: withUrls,
         calorieInsights: generatedInsights,
@@ -1538,7 +1566,7 @@ const HomeScreen = ({ navigation }) => {
                     activeOpacity={0.88}
                   >
                     <View style={styles.mealLogTopRow}>
-                      {meal.photo_url && (meal.photo_url.startsWith("http") || meal.photo_url.startsWith("file://")) ? (
+                      {meal.photo_url && (meal.photo_url.startsWith("http") || meal.photo_url.startsWith("file://") || meal.photo_url.startsWith("content://") || meal.photo_url.startsWith("data:")) ? (
                         <Image
                           source={{ uri: meal.photo_url }}
                           style={styles.mealLogImage}
@@ -2097,19 +2125,20 @@ const createStyles = (palette, isDark) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
+      gap: 8,
+      flexWrap: "nowrap",
     },
 
     streakBadge: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: palette.cardSecondary,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
+      paddingVertical: 7,
+      paddingHorizontal: 10,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: palette.border,
+      flexShrink: 1,
     },
 
     streakBadgeGrace: {
@@ -2118,19 +2147,19 @@ const createStyles = (palette, isDark) =>
     },
 
     streakEmoji: {
-      fontSize: 14,
-      marginRight: 6,
+      fontSize: 13,
+      marginRight: 4,
     },
 
     streakText: {
       fontFamily: 'Lexend-SemiBold',
-      fontSize: 12,
+      fontSize: 11.5,
       color: palette.textPrimary,
     },
 
     streakMaxText: {
       fontFamily: 'Lexend-Regular',
-      fontSize: 11,
+      fontSize: 10.5,
       color: palette.textSecondary,
     },
 

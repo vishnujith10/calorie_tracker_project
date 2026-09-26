@@ -15,6 +15,55 @@ const EDGE_KEY = Constants.expoConfig?.extra?.supabaseServiceRoleKey || null;
 
 // -------------------- USER FOOD LOGS (SDK, RLS safe) --------------------
 
+export const resolveMealPhotoUrl = async (meal) => {
+  if (!meal) return meal;
+  const rawUrl =
+    meal.photo_url ||
+    meal.image_url ||
+    meal.image ||
+    meal.photo_path ||
+    meal.photo ||
+    meal.local_photo_uri;
+
+  if (!rawUrl) return meal;
+
+  if (
+    typeof rawUrl === "string" &&
+    (rawUrl.startsWith("http://") ||
+      rawUrl.startsWith("https://") ||
+      rawUrl.startsWith("file://") ||
+      rawUrl.startsWith("content://") ||
+      rawUrl.startsWith("data:"))
+  ) {
+    return { ...meal, photo_url: rawUrl };
+  }
+
+  if (typeof rawUrl === "string") {
+    const cleanPath = rawUrl.replace(/^food-photos\//, "");
+    try {
+      const { data: signedData } = await supabase.storage
+        .from("food-photos")
+        .createSignedUrl(cleanPath, 60 * 60 * 24);
+
+      if (signedData?.signedUrl) {
+        return { ...meal, photo_url: signedData.signedUrl };
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("food-photos")
+        .getPublicUrl(cleanPath);
+
+      if (publicData?.publicUrl) {
+        return { ...meal, photo_url: publicData.publicUrl };
+      }
+    } catch (e) {
+      console.log("Error resolving photo for meal:", e);
+    }
+  }
+
+  return { ...meal, photo_url: rawUrl };
+};
+
 export const getFoodLogs = async (userId) => {
   try {
     if (!userId) throw new Error("userId is required");

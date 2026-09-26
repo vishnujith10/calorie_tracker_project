@@ -122,10 +122,17 @@ const StreakBadge = React.memo(
     return (
       <View style={[streakStyles.badge, graceActive && streakStyles.graceBadge]}>
         <Text style={streakStyles.emoji}>{emoji}</Text>
-        <Text style={streakStyles.text}>{label}</Text>
-        {maxStreak > 0 && (
-          <Text style={streakStyles.maxText}> · Best {maxStreak}</Text>
-        )}
+        <Text
+          style={streakStyles.text}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {label}
+          {maxStreak > 0 && (
+            <Text style={streakStyles.maxText}> · Best {maxStreak}</Text>
+          )}
+        </Text>
       </View>
     );
   },
@@ -282,18 +289,26 @@ const MainDashboardScreen = ({ route }) => {
   ]);
 
   const [calorieStreak, setCalorieStreak] = useState(() => {
-    const now = Date.now();
-    if (
-      streakCache.cachedStreak !== null &&
-      now - streakCache.lastFetch < streakCache.CACHE_DURATION
-    ) {
-      const cached = streakCache.cachedStreak;
+    const cached = streakCache.cachedStreak;
+    if (cached !== null && cached !== undefined) {
       return typeof cached === 'object' ? (cached.streak ?? 0) : cached;
     }
     return 0;
   });
-  const [graceActive, setGraceActive] = useState(false);
-  const [maxStreak, setMaxStreak] = useState(0);
+  const [graceActive, setGraceActive] = useState(() => {
+    const cached = streakCache.cachedStreak;
+    if (cached !== null && cached !== undefined && typeof cached === 'object') {
+      return cached.graceActive ?? false;
+    }
+    return false;
+  });
+  const [maxStreak, setMaxStreak] = useState(() => {
+    const cached = streakCache.cachedStreak;
+    if (cached !== null && cached !== undefined && typeof cached === 'object') {
+      return cached.maxStreak ?? 0;
+    }
+    return 0;
+  });
 
   const calorieStreakRef = useRef(calorieStreak);
 
@@ -1776,8 +1791,9 @@ const createStyles = (COLORS, isDark) => {
     checkInRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
+      gap: 8,
+      flexWrap: "nowrap",
+      width: "100%",
     },
 
     checkInButton: {
@@ -1785,11 +1801,12 @@ const createStyles = (COLORS, isDark) => {
       alignItems: "center",
       backgroundColor: COLORS.card,
       paddingVertical: 10,
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: COLORS.cardBorderStrong,
       alignSelf: "flex-start",
+      flexShrink: 0,
     },
 
     checkInButtonText: {
@@ -2679,10 +2696,11 @@ const createStreakStyles = (colors, isDark) =>
       alignItems: 'center',
       backgroundColor: isDark ? 'rgba(168, 213, 206, 0.12)' : '#E4F3F0',
       paddingVertical: 9,
-      paddingHorizontal: 12,
+      paddingHorizontal: 10,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(168, 213, 206, 0.18)' : '#CFE7E2',
+      flexShrink: 1,
     },
     graceBadge: {
       borderColor: '#4FC3F7',
@@ -2690,12 +2708,13 @@ const createStreakStyles = (colors, isDark) =>
     },
     emoji: {
       fontSize: 14,
-      marginRight: 5,
+      marginRight: 4,
     },
     text: {
       fontFamily: 'Lexend-SemiBold',
       fontSize: 12,
       color: isDark ? '#EAF7F5' : '#1F4E4A',
+      flexShrink: 1,
     },
     maxText: {
       fontFamily: 'Lexend-Regular',
