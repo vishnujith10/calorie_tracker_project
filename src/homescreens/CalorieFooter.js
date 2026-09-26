@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Dimensions, Easing, Modal, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AI_CONFIG } from '../config/aiConfig';
 import supabase from '../lib/supabase';
 import { createFoodLog } from '../utils/api';
 
@@ -359,7 +360,7 @@ const VoiceLoggingModal = ({ visible, onClose, onLog, mealType }) => {
         ]);
       };
 
-      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+      const models = AI_CONFIG.MODELS;
       const audioData = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const prompt = `Analyze the food items in this audio. Your response MUST be a single valid JSON object and nothing else. Do not include markdown formatting like \`\`\`json.
 

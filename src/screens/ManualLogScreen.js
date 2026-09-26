@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AI_CONFIG } from '../config/aiConfig';
 import supabase from '../lib/supabase';
 
 const ManualLogScreen = ({ route, navigation }) => {
@@ -53,7 +54,7 @@ const ManualLogScreen = ({ route, navigation }) => {
         ]);
       };
 
-      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+      const models = AI_CONFIG.MODELS;
       const prompt = `
         Analyze the food described in this text: "${foodQuery}".
         Your response MUST be a valid JSON object and nothing else.
@@ -240,7 +241,7 @@ EXAMPLE: If user enters "200g black beans", calculate nutrition for exactly 200g
         ]);
       };
 
-      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+      const models = AI_CONFIG.MODELS;
       let lastError = null;
       for (const modelName of models) {
         try {

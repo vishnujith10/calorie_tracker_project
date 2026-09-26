@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
+import { AI_CONFIG } from '../config/aiConfig';
 
 const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants.expoConfig?.extra?.EXPO_PUBLIC_GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -37,7 +38,7 @@ const extractJSON = (text) => {
 export const detectFoodItems = async (photoUri) => {
   if (!genAI) throw new Error('AI API key is not configured.');
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  const model = genAI.getGenerativeModel({ model: AI_CONFIG.PRIMARY_MODEL });
   const imageData = await FileSystem.readAsStringAsync(photoUri, { encoding: 'base64' });
   
   const prompt = `Analyze this food image and return a JSON list of the distinct food items visible. 
@@ -75,7 +76,7 @@ Return ONLY valid JSON like this: {"items": ["Item 1", "Item 2"]}`;
 export const calculateDetailedNutrition = async (photoUri, refinedItems) => {
   if (!genAI) throw new Error('AI API key is not configured.');
 
-  const visionModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+  const visionModels = AI_CONFIG.VISION_MODELS;
   const imageData = await FileSystem.readAsStringAsync(photoUri, { encoding: 'base64' });
 
   const prompt = `Analyze this food image and the following refined items provided by the user:
@@ -153,7 +154,7 @@ Guidelines:
 export const generateDailySummary = async (metrics) => {
   if (!genAI) throw new Error('AI API key is not configured.');
   
-  const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+  const models = AI_CONFIG.MODELS;
   const prompt = `You are a supportive, expert nutrition coach for the app Calora. 
 Write a short, engaging daily summary (3-4 sentences max) for the user based on today's metrics:
 - Calories: ${metrics.calories} kcal (Goal: ${metrics.calorieGoal})
@@ -219,7 +220,7 @@ Guidelines for your response:
     parts: [{ text: msg.content }]
   }));
 
-  const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+  const models = AI_CONFIG.MODELS;
   let lastError = null;
 
   for (const modelName of models) {

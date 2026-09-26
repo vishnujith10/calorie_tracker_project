@@ -22,6 +22,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
+import { AI_CONFIG } from "../config/aiConfig";
 import supabase from "../lib/supabase";
 
 // Initialize Gemini AI
@@ -722,10 +723,7 @@ const PostCalorieScreen = ({ route, navigation }) => {
 
     setIsReanalyzing(true);
     try {
-      const models = [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash-lite",
-      ];
+      const models = AI_CONFIG.MODELS;
       let lastError = null;
 
       for (const modelName of models) {

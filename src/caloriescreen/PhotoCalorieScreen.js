@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { AI_CONFIG } from '../config/aiConfig';
 import supabase from '../lib/supabase';
 import { createFoodLog } from '../utils/api';
 
@@ -70,7 +71,7 @@ const PhotoCalorieScreen = ({ route, navigation }) => {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const visionModels = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
+  const visionModels = AI_CONFIG.VISION_MODELS;
 
   useEffect(() => {
     if (photoUri) {
@@ -456,7 +457,7 @@ Guidelines:
 
     setIsReanalyzing(true);
     try {
-      const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+      const models = AI_CONFIG.MODELS;
       let lastError = null;
 
       for (const modelName of models) {

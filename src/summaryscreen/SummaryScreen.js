@@ -22,6 +22,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { OnboardingContext } from '../context/OnboardingContext';
 import { useTheme } from '../context/ThemeContext';
 import * as FileSystem from 'expo-file-system/legacy';
+import { AI_CONFIG } from '../config/aiConfig';
 import supabase from '../lib/supabase';
 import { getFoodLogs } from '../utils/api';
 
@@ -425,7 +426,7 @@ const SummaryScreen = () => {
     if (!genAI) throw new Error('Gemini API not configured');
 
     const prompt = buildPrompt(data);
-    const models = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+    const models = AI_CONFIG.MODELS;
     let lastError = null;
 
     for (const modelName of models) {

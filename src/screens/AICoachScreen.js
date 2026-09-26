@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AI_CONFIG } from '../config/aiConfig';
 import { useTheme } from '../context/ThemeContext';
 import supabase from '../lib/supabase';
 
@@ -486,7 +487,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       if (!genAI) return;
 
       const systemPrompt = buildSystemPrompt(ctx, allSessions);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      const model = genAI.getGenerativeModel({ model: AI_CONFIG.PRIMARY_MODEL });
       const session = model.startChat({
         history: [
           { role: 'user', parts: [{ text: systemPrompt }] },
@@ -539,7 +540,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+    const model = genAI.getGenerativeModel({ model: AI_CONFIG.PRIMARY_MODEL });
     const session = model.startChat({ history: geminiHistory });
     setChatSession(session);
   };
@@ -609,7 +610,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
           const allSessions = await loadSessions();
           const otherSessions = allSessions.filter((s) => s.id !== sessionIdRef.current);
           const systemPrompt = buildSystemPrompt(userContext, otherSessions);
-          const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+          const model = genAI.getGenerativeModel({ model: AI_CONFIG.PRIMARY_MODEL });
           const newChat = model.startChat({
             history: [
               { role: 'user', parts: [{ text: systemPrompt }] },
@@ -653,7 +654,7 @@ Use this memory to provide continuity and more personalized advice. Do not expli
           });
         }
 
-        const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+        const fallbackModel = genAI.getGenerativeModel({ model: AI_CONFIG.FALLBACK_MODEL });
         const fallbackSession = fallbackModel.startChat({ history: fallbackHistory });
         const fallbackResult = await raceWithTimeout(
           fallbackSession.sendMessage(userText),

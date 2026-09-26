@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AI_CONFIG } from "../config/aiConfig";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 
@@ -183,11 +184,7 @@ export default function QuickLogScreen({ navigation }) {
         ]);
       };
 
-      // Use fewer models for faster performance - start with the most reliable one
-      const models = [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash-lite",
-      ];
+      const models = AI_CONFIG.MODELS;
       let lastError = null;
 
       for (const modelName of models) {
