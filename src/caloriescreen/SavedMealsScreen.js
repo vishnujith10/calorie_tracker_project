@@ -173,7 +173,7 @@ const SavedMealsScreen = ({ navigation, route }) => {
   );
 
   const navigateToHome = useCallback(() => {
-    navigation.navigate("MainDashboard");
+    navigation.navigate("Home");
   }, [navigation]);
 
   useFocusEffect(
