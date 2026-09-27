@@ -1394,27 +1394,7 @@ const HomeScreen = ({ navigation }) => {
               styles={styles}
               themeKey={themeKey}
             />
-            {/* Streak-at-risk warning — shown from midday if today's goal not yet met */}
-            {(() => {
-              const hour = new Date().getHours();
-              const riskCals = getStreakRiskCalories(
-                totals.calories,
-                dailyGoal,
-                goal_type,
-                calorieStreak,
-                graceActive,
-              );
-              if (hour >= 12 && riskCals !== null && riskCals > 0) {
-                return (
-                  <View style={styles.streakRiskBanner}>
-                    <Text style={styles.streakRiskText}>
-                      ⚡ Log {Math.round(riskCals)} more kcal to keep your streak!
-                    </Text>
-                  </View>
-                );
-              }
-              return null;
-            })()}
+
           </View>
         </View>
 
@@ -2175,7 +2155,7 @@ const createStyles = (palette, isDark) =>
 
     streakRiskText: {
       fontFamily: 'Lexend-SemiBold',
-      fontSize: 12,
+      fontSize: 10,
       color: isDark ? '#FFB74D' : '#E65100',
     },
 
