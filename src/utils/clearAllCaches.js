@@ -1,6 +1,7 @@
 // Utility to clear all global caches on logout/login
 // This prevents showing previous user's data when switching accounts
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { invalidateAllCaches } from './cacheManager';
 
 // Clear all global caches
@@ -126,6 +127,31 @@ export const clearAllGlobalCaches = () => {
     console.log('Could not reset OnboardingContext:', e.message);
   }
   
+  // Clear user-specific AsyncStorage keys (Summary cache, AI Coach sessions, onboarding data)
+  try {
+    AsyncStorage.getAllKeys()
+      .then((keys) => {
+        const keysToRemove = keys.filter(
+          (k) =>
+            k.startsWith('@calora_summary_cache_') ||
+            k.startsWith('@calora_ai_coach_sessions') ||
+            k === 'lastCheckDate' ||
+            k === 'onboarded' ||
+            k === 'onboardingData' ||
+            k === 'calora_onboarding_data'
+        );
+        if (keysToRemove.length > 0) {
+          AsyncStorage.multiRemove(keysToRemove);
+          console.log('✅ Cleared user AsyncStorage cache keys:', keysToRemove);
+        }
+      })
+      .catch((err) => {
+        console.log('AsyncStorage multiRemove error:', err?.message);
+      });
+  } catch (e) {
+    console.log('Could not clear AsyncStorage summary caches:', e?.message);
+  }
+
   // Note: Other non-exported caches will naturally expire when screens check cache validity.
   
   console.log('✅ All caches cleared');

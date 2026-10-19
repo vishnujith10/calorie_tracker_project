@@ -7,12 +7,7 @@
         "simulator": true
       },
       "android": {
-        "buildType": "apk",
-        "env": {
-          "EXPO_PUBLIC_SUPABASE_URL": "https://egqigyjixunzbvxnojpq.supabase.co",
-          "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncWlneWppeHVuemJ2eG5vanBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODIzMjEsImV4cCI6MjEwNDM1ODMyMX0.78lIqwt-e2Xnn_fAeRcu4_EDcAfTNFF7hbuB_PFeuNY",
-          "GOOGLE_CLIENT_ID": "487994715483-l4alanlgluq4rnvn1iej5a8lsq9k9jr8.apps.googleusercontent.com"
-        }
+        "buildType": "apk"
       }
     },
     "production": {
@@ -20,17 +15,7 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
         "env": {
-          "EXPO_USE_LEGACY_ANDROIDX": "false",
-          "EXPO_PUBLIC_SUPABASE_URL": "https://egqigyjixunzbvxnojpq.supabase.co",
-          "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncWlneWppeHVuemJ2eG5vanBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODIzMjEsImV4cCI6MjEwNDM1ODMyMX0.78lIqwt-e2Xnn_fAeRcu4_EDcAfTNFF7hbuB_PFeuNY",
-          "GOOGLE_CLIENT_ID": "487994715483-l4alanlgluq4rnvn1iej5a8lsq9k9jr8.apps.googleusercontent.com"
-        }
-      },
-      "ios": {
-        "env": {
-          "EXPO_PUBLIC_SUPABASE_URL": "https://egqigyjixunzbvxnojpq.supabase.co",
-          "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncWlneWppeHVuemJ2eG5vanBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODIzMjEsImV4cCI6MjEwNDM1ODMyMX0.78lIqwt-e2Xnn_fAeRcu4_EDcAfTNFF7hbuB_PFeuNY",
-          "GOOGLE_CLIENT_ID": "487994715483-l4alanlgluq4rnvn1iej5a8lsq9k9jr8.apps.googleusercontent.com"
+          "EXPO_USE_LEGACY_ANDROIDX": "false"
         }
       }
     }

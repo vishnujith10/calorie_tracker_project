@@ -129,6 +129,12 @@ export const handleGoogleSignIn = async () => {
 export const handleGoogleSignOut = async () => {
   try {
     try {
+      const { clearAllGlobalCaches } = require('../utils/clearAllCaches');
+      clearAllGlobalCaches();
+    } catch (cacheErr) {
+      console.log('Error clearing caches on Google sign out:', cacheErr);
+    }
+    try {
       await GoogleSignin.signOut();
     } catch (googleError) {
       // Non-fatal if user wasn't signed in to Google client

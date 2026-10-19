@@ -360,9 +360,19 @@ export default function AICoachScreen({ navigation }) {
   };
 
   // ─── AsyncStorage: Session Management ────────────────────────────────────
+  const getUserSessionsKey = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.user?.id ? `${SESSIONS_KEY}_${session.user.id}` : SESSIONS_KEY;
+    } catch {
+      return SESSIONS_KEY;
+    }
+  };
+
   const loadSessions = async () => {
     try {
-      const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+      const storageKey = await getUserSessionsKey();
+      const raw = await AsyncStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         setSessions(parsed);
@@ -381,7 +391,8 @@ export default function AICoachScreen({ navigation }) {
     if (!hasUserMessages) return; // Don't save empty sessions
 
     try {
-      const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+      const storageKey = await getUserSessionsKey();
+      const raw = await AsyncStorage.getItem(storageKey);
       let allSessions = raw ? JSON.parse(raw) : [];
       const idx = allSessions.findIndex((s) => s.id === sessionId);
 
@@ -400,7 +411,7 @@ export default function AICoachScreen({ navigation }) {
       }
 
       allSessions = allSessions.slice(0, MAX_SESSIONS);
-      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(allSessions));
+      await AsyncStorage.setItem(storageKey, JSON.stringify(allSessions));
       setSessions(allSessions);
     } catch (e) {
       console.log('AICoachScreen - saveSession error:', e);
@@ -409,10 +420,11 @@ export default function AICoachScreen({ navigation }) {
 
   const deleteSession = async (sessionId) => {
     try {
-      const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+      const storageKey = await getUserSessionsKey();
+      const raw = await AsyncStorage.getItem(storageKey);
       let allSessions = raw ? JSON.parse(raw) : [];
       allSessions = allSessions.filter((s) => s.id !== sessionId);
-      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(allSessions));
+      await AsyncStorage.setItem(storageKey, JSON.stringify(allSessions));
       setSessions(allSessions);
     } catch (e) {
       console.log('AICoachScreen - deleteSession error:', e);

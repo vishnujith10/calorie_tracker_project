@@ -271,12 +271,15 @@ const SummaryScreen = () => {
   const yesterdayDisplay = useMemo(() => getYesterdayDisplay(), []);
 
   // ── Fetch yesterday's data from Supabase ──
-  const fetchYesterdayData = useCallback(async () => {
+  const fetchYesterdayData = useCallback(async (explicitUserId) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      let userId = explicitUserId;
+      if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+        userId = user.id;
+      }
 
-      const userId = user.id;
       const yesterdayStart = new Date(yesterdayDate + 'T00:00:00');
       const yesterdayEnd = new Date(yesterdayDate + 'T23:59:59.999');
 
@@ -458,27 +461,53 @@ const SummaryScreen = () => {
       setError(null);
       setNoData(false);
 
-      // Check cache first
-      const cacheKey = CACHE_KEY_PREFIX + yesterdayDate;
-      const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        setAiData(parsed.aiData);
-        setRawData(parsed.rawData);
+      // 1. Get current authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        setAiData(null);
+        setRawData(null);
+        setNoData(true);
         setLoading(false);
         return;
       }
 
-      // Fetch fresh data
-      const data = await fetchYesterdayData();
+      const userId = user.id;
+      const cacheKey = `${CACHE_KEY_PREFIX}${userId}_${yesterdayDate}`;
+
+      // Clean up legacy non-user-scoped key if present
+      AsyncStorage.removeItem(CACHE_KEY_PREFIX + yesterdayDate).catch(() => {});
+
+      // 2. Check user-scoped cache first
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.userId === userId && parsed.aiData && parsed.rawData) {
+            setAiData(parsed.aiData);
+            setRawData(parsed.rawData);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached summary:', e);
+        }
+      }
+
+      // Fresh load: clear any previous in-memory state
+      setAiData(null);
+      setRawData(null);
+
+      // 3. Fetch fresh data for current user
+      const data = await fetchYesterdayData(userId);
       if (!data) return; // noData state already set
 
-      // Generate AI summary
+      // 4. Generate AI summary
       const aiResult = await generateAISummary(data);
       setAiData(aiResult);
 
-      // Cache for the day
+      // 5. Cache for the day scoped to this user
       await AsyncStorage.setItem(cacheKey, JSON.stringify({
+        userId,
         aiData: aiResult,
         rawData: data,
         timestamp: Date.now(),
