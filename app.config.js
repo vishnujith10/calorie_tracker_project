@@ -43,6 +43,7 @@ export default {
         "RECORD_AUDIO",
         "RECEIVE_BOOT_COMPLETED",
         "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "WAKE_LOCK",
       ],

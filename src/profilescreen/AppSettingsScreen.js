@@ -441,6 +441,11 @@ const AppSettingsScreen = () => {
     language,
   ]);
 
+  const saveSettingsRef = useRef(saveSettings);
+  useEffect(() => {
+    saveSettingsRef.current = saveSettings;
+  }, [saveSettings]);
+
   // Request notification permissions and setup Android channel
   useEffect(() => {
     const requestPermissions = async () => {
@@ -478,10 +483,51 @@ const AppSettingsScreen = () => {
     }, 1000);
   }, []);
 
+  // Track latest notification settings in a ref to avoid recreating callbacks
+  const settingsStateRef = useRef({
+    dailyReminders,
+    mealReminders,
+    hydrationReminders,
+    sleepReminders,
+    mealReminderTime,
+    hydrationReminderTime,
+    sleepReminderTime,
+  });
+
+  useEffect(() => {
+    settingsStateRef.current = {
+      dailyReminders,
+      mealReminders,
+      hydrationReminders,
+      sleepReminders,
+      mealReminderTime,
+      hydrationReminderTime,
+      sleepReminderTime,
+    };
+  }, [
+    dailyReminders,
+    mealReminders,
+    hydrationReminders,
+    sleepReminders,
+    mealReminderTime,
+    hydrationReminderTime,
+    sleepReminderTime,
+  ]);
+
   // After settings load, ensure OS has notifications registered if toggles are enabled.
   // This handles cases where OS cleared scheduled notifications (reboot, memory pressure, etc.)
   const ensureNotificationsScheduled = useCallback(async () => {
     try {
+      const {
+        dailyReminders: daily,
+        mealReminders: meal,
+        hydrationReminders: hydration,
+        sleepReminders: sleep,
+        mealReminderTime: mTime,
+        hydrationReminderTime: hTime,
+        sleepReminderTime: sTime,
+      } = settingsStateRef.current;
+
       const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
 
       const isScheduled = (title) =>
@@ -490,20 +536,20 @@ const AppSettingsScreen = () => {
       const checks = [
         {
           type: "meal",
-          enabled: dailyReminders && mealReminders,
-          time: mealReminderTime,
+          enabled: daily && meal,
+          time: mTime,
           title: "Meal Reminder",
         },
         {
           type: "hydration",
-          enabled: dailyReminders && hydrationReminders,
-          time: hydrationReminderTime,
+          enabled: daily && hydration,
+          time: hTime,
           title: "Hydration Reminder",
         },
         {
           type: "sleep",
-          enabled: dailyReminders && sleepReminders,
-          time: sleepReminderTime,
+          enabled: daily && sleep,
+          time: sTime,
           title: "Sleep Reminder",
         },
       ];
@@ -522,31 +568,27 @@ const AppSettingsScreen = () => {
     } catch (error) {
       console.error("Error ensuring notifications scheduled:", error);
     }
-  }, [
-    dailyReminders,
-    mealReminders,
-    hydrationReminders,
-    sleepReminders,
-    mealReminderTime,
-    hydrationReminderTime,
-    sleepReminderTime,
-    scheduleNotification,
-    cancelNotification,
-  ]);
+  }, [scheduleNotification, cancelNotification]);
 
-  // Load settings on mount and verify OS notifications are in sync
+  const ensureNotificationsScheduledRef = useRef(ensureNotificationsScheduled);
+  useEffect(() => {
+    ensureNotificationsScheduledRef.current = ensureNotificationsScheduled;
+  }, [ensureNotificationsScheduled]);
+
+  // Load settings on mount and verify OS notifications are in sync - RUNS ONCE ON MOUNT ONLY
   useEffect(() => {
     const init = async () => {
       await loadSettings();
       // Wait for mount flag to be cleared (set to false after 1s),
       // then verify the OS has the alarms registered and re-schedule if missing
       setTimeout(async () => {
-        // isInitialMount becomes false after 1s - at 1.5s it should be false
-        await ensureNotificationsScheduled();
+        if (ensureNotificationsScheduledRef.current) {
+          await ensureNotificationsScheduledRef.current();
+        }
       }, 1800);
     };
     init();
-  }, [loadSettings, ensureNotificationsScheduled]);
+  }, [loadSettings]);
 
   // Handle hardware back button - go back normally
   useFocusEffect(
@@ -786,10 +828,46 @@ const AppSettingsScreen = () => {
     [cancelNotification],
   );
 
-  // SEPARATE useEffects for each notification type to prevent cascade updates
-  // Handle meal reminders toggle
+  // Helper to check and request notification permissions
+  const checkAndRequestNotificationPermission = async () => {
+    try {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please enable notification permissions in your phone's Settings to receive reminders.",
+          [{ text: "OK" }],
+        );
+        return false;
+      }
+
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "Default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+          sound: "default",
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Error requesting notification permissions:", error);
+      return false;
+    }
+  };
+
+  // Handle meal reminders toggle & time changes
   useEffect(() => {
-    if (isInitialMount.current) return; // Skip on initial mount
+    if (isInitialMount.current) return;
 
     const timeoutId = setTimeout(async () => {
       if (dailyReminders && mealReminders) {
@@ -797,30 +875,15 @@ const AppSettingsScreen = () => {
       } else {
         await cancelNotification("meal");
       }
-      // Save settings to local storage
-      await saveSettings();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [mealReminders, dailyReminders, saveSettings]);
-
-  // Handle meal time changes (only reschedule if already enabled)
-  useEffect(() => {
-    if (isInitialMount.current) return; // Skip on initial mount
-
-    const timeoutId = setTimeout(async () => {
-      if (dailyReminders && mealReminders) {
-        console.log("⏰ Meal time changed, rescheduling...");
-        await scheduleNotification("meal", mealReminderTime, true);
+      if (saveSettingsRef.current) {
+        await saveSettingsRef.current();
       }
-      // Save settings to local storage
-      await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [mealReminderTime, saveSettings]);
+  }, [mealReminders, dailyReminders, mealReminderTime, scheduleNotification, cancelNotification]);
 
-  // Handle hydration reminders toggle
+  // Handle hydration reminders toggle & time changes
   useEffect(() => {
     if (isInitialMount.current) return;
 
@@ -830,30 +893,15 @@ const AppSettingsScreen = () => {
       } else {
         await cancelNotification("hydration");
       }
-      // Save settings to local storage
-      await saveSettings();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [hydrationReminders, dailyReminders, saveSettings]);
-
-  // Handle hydration time changes
-  useEffect(() => {
-    if (isInitialMount.current) return;
-
-    const timeoutId = setTimeout(async () => {
-      if (dailyReminders && hydrationReminders) {
-        console.log("⏰ Hydration time changed, rescheduling...");
-        await scheduleNotification("hydration", hydrationReminderTime, true);
+      if (saveSettingsRef.current) {
+        await saveSettingsRef.current();
       }
-      // Save settings to local storage
-      await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [hydrationReminderTime, saveSettings]);
+  }, [hydrationReminders, dailyReminders, hydrationReminderTime, scheduleNotification, cancelNotification]);
 
-  // Handle sleep reminders toggle
+  // Handle sleep reminders toggle & time changes
   useEffect(() => {
     if (isInitialMount.current) return;
 
@@ -863,75 +911,61 @@ const AppSettingsScreen = () => {
       } else {
         await cancelNotification("sleep");
       }
-      // Save settings to database
-      await saveSettings();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [
-    sleepReminders,
-    dailyReminders,
-    sleepReminderTime,
-    saveSettings,
-    scheduleNotification,
-    cancelNotification,
-  ]);
-
-  // Handle sleep time changes
-  useEffect(() => {
-    if (isInitialMount.current) return;
-
-    const timeoutId = setTimeout(async () => {
-      if (dailyReminders && sleepReminders) {
-        console.log("⏰ Sleep time changed, rescheduling...");
-        await scheduleNotification("sleep", sleepReminderTime, true);
+      if (saveSettingsRef.current) {
+        await saveSettingsRef.current();
       }
-      // Save settings to database
-      await saveSettings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [
-    sleepReminderTime,
-    dailyReminders,
-    sleepReminders,
-    saveSettings,
-    scheduleNotification,
-  ]);
+  }, [sleepReminders, dailyReminders, sleepReminderTime, scheduleNotification, cancelNotification]);
 
   const handleFocusAreaToggle = (area) => {
     setFocusAreas((prev) => ({ ...prev, [area]: !prev[area] }));
   };
 
-  // Handle daily reminders toggle - save to database
+  // Handle daily reminders toggle - save to storage
   useEffect(() => {
     if (isInitialMount.current) return;
 
     const timeoutId = setTimeout(async () => {
-      await saveSettings();
+      if (saveSettingsRef.current) {
+        await saveSettingsRef.current();
+      }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [dailyReminders, saveSettings]);
+  }, [dailyReminders]);
 
   // Save settings when AI Insights, focus areas, or other preferences change
   useEffect(() => {
     if (isInitialMount.current) return;
 
     const timeoutId = setTimeout(async () => {
-      await saveSettings();
+      if (saveSettingsRef.current) {
+        await saveSettingsRef.current();
+      }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [
-    aiInsights,
-    focusAreas,
-    anonymousDataSharing,
-    language,
-    saveSettings,
-  ]);
+  }, [aiInsights, focusAreas, anonymousDataSharing, language]);
 
-  const handleDailyRemindersToggle = (value) => {
+  const handleDailyRemindersToggle = async (value) => {
+    if (value) {
+      const granted = await checkAndRequestNotificationPermission();
+      if (!granted) {
+        return;
+      }
+    }
+
+    if (globalSettingsCache.cachedData) {
+      globalSettingsCache.cachedData.dailyReminders = value;
+      if (!value) {
+        globalSettingsCache.cachedData.mealReminders = false;
+        globalSettingsCache.cachedData.hydrationReminders = false;
+        globalSettingsCache.cachedData.sleepReminders = false;
+      }
+    }
+
     setDailyReminders(value);
     if (!value) {
       setMealReminders(false);
@@ -940,23 +974,59 @@ const AppSettingsScreen = () => {
     }
   };
 
-  const handleMealRemindersToggle = (value) => {
-    if (value && !dailyReminders) {
-      return;
+  const handleMealRemindersToggle = async (value) => {
+    if (value) {
+      const granted = await checkAndRequestNotificationPermission();
+      if (!granted) {
+        return;
+      }
+      if (!dailyReminders) {
+        setDailyReminders(true);
+        if (globalSettingsCache.cachedData) {
+          globalSettingsCache.cachedData.dailyReminders = true;
+        }
+      }
+    }
+    if (globalSettingsCache.cachedData) {
+      globalSettingsCache.cachedData.mealReminders = value;
     }
     setMealReminders(value);
   };
 
-  const handleHydrationRemindersToggle = (value) => {
-    if (value && !dailyReminders) {
-      return;
+  const handleHydrationRemindersToggle = async (value) => {
+    if (value) {
+      const granted = await checkAndRequestNotificationPermission();
+      if (!granted) {
+        return;
+      }
+      if (!dailyReminders) {
+        setDailyReminders(true);
+        if (globalSettingsCache.cachedData) {
+          globalSettingsCache.cachedData.dailyReminders = true;
+        }
+      }
+    }
+    if (globalSettingsCache.cachedData) {
+      globalSettingsCache.cachedData.hydrationReminders = value;
     }
     setHydrationReminders(value);
   };
 
-  const handleSleepRemindersToggle = (value) => {
-    if (value && !dailyReminders) {
-      return;
+  const handleSleepRemindersToggle = async (value) => {
+    if (value) {
+      const granted = await checkAndRequestNotificationPermission();
+      if (!granted) {
+        return;
+      }
+      if (!dailyReminders) {
+        setDailyReminders(true);
+        if (globalSettingsCache.cachedData) {
+          globalSettingsCache.cachedData.dailyReminders = true;
+        }
+      }
+    }
+    if (globalSettingsCache.cachedData) {
+      globalSettingsCache.cachedData.sleepReminders = value;
     }
     setSleepReminders(value);
   };
@@ -1285,24 +1355,24 @@ const AppSettingsScreen = () => {
                 mealReminders,
                 handleMealRemindersToggle,
                 formatTime(mealReminderTime),
-                !dailyReminders,
-                !dailyReminders ? null : () => setShowMealTimePicker(true),
+                false,
+                () => setShowMealTimePicker(true),
               )}
               {renderToggleItem(
                 "Hydration Reminders",
                 hydrationReminders,
                 handleHydrationRemindersToggle,
                 formatTime(hydrationReminderTime),
-                !dailyReminders,
-                !dailyReminders ? null : () => setShowHydrationTimePicker(true),
+                false,
+                () => setShowHydrationTimePicker(true),
               )}
               {renderToggleItem(
                 "Sleep Reminders",
                 sleepReminders,
                 handleSleepRemindersToggle,
                 formatTime(sleepReminderTime),
-                !dailyReminders,
-                !dailyReminders ? null : () => setShowSleepTimePicker(true),
+                false,
+                () => setShowSleepTimePicker(true),
               )}
             </View>,
           )}
