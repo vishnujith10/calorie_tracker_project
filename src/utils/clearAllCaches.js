@@ -60,7 +60,15 @@ export const clearAllGlobalCaches = () => {
   
     // ExerciseScreen cache removed
   
-    // WeightTrackerScreen cache removed
+  try {
+    const WeightTrackerScreen = require('../weightscreen/WeightTrackerScreen');
+    if (WeightTrackerScreen.globalWeightCache) {
+      WeightTrackerScreen.globalWeightCache.lastFetchTime = 0;
+      WeightTrackerScreen.globalWeightCache.cachedData = null;
+    }
+  } catch (e) {
+    console.log('Could not clear WeightTrackerScreen cache:', e.message);
+  }
   
   try {
     // SleepTrackerScreen cache

@@ -125,13 +125,10 @@ const generateWeightInsights = ({
 
     const wCurrent = Number(logs[0].weight);
     const wHistorical = Number(historicalLog.weight);
-    const totalChangeKg = wCurrent - wHistorical;
-    const weeklyRateKg = (totalChangeKg / daysDiff) * 7;
+    const totalChange = wCurrent - wHistorical;
+    const weeklyRate = (totalChange / daysDiff) * 7;
 
-    weeklySpeed =
-      weightUnit === "lbs"
-        ? Number((weeklyRateKg * 2.20462).toFixed(1))
-        : Number(weeklyRateKg.toFixed(1));
+    weeklySpeed = Number(weeklyRate.toFixed(1));
     hasWeeklyRate = true;
   } else if (
     logs &&
@@ -140,11 +137,8 @@ const generateWeightInsights = ({
   ) {
     const startWeight = Number(userProfile?.weight || onboardingData?.weight);
     const wCurrent = Number(logs[0].weight);
-    const diffKg = wCurrent - startWeight;
-    weeklySpeed =
-      weightUnit === "lbs"
-        ? Number((diffKg * 2.20462).toFixed(1))
-        : Number(diffKg.toFixed(1));
+    const diff = wCurrent - startWeight;
+    weeklySpeed = Number(diff.toFixed(1));
     hasWeeklyRate = Math.abs(weeklySpeed) > 0.05;
   }
 
@@ -260,10 +254,8 @@ const generateWeightInsights = ({
 
   // 4. Milestone / Encouragement
   if (goalWeight && currentWeight) {
-    const currentNum =
-      weightUnit === "lbs" ? currentWeight * 2.20462 : currentWeight;
-    const goalNum =
-      weightUnit === "lbs" ? Number(goalWeight) * 2.20462 : Number(goalWeight);
+    const currentNum = Number(currentWeight);
+    const goalNum = Number(goalWeight);
     const remainingDiff = Math.abs(currentNum - goalNum).toFixed(1);
 
     if (Number(remainingDiff) < 0.5) {
@@ -482,13 +474,9 @@ const WeightTrackerScreen = ({ navigation }) => {
     setWeightInsights(insights);
   }, [logs, currentWeight, goalWeight, userProfile, onboardingData, weightUnit]);
 
-  // Display value for current weight (with unit conversion if necessary)
-  const displayWeight =
-    currentWeight != null
-      ? weightUnit === "lbs"
-        ? Number((currentWeight * 2.20462).toFixed(1))
-        : currentWeight
-      : null;
+  // Display value for current weight (already in user's selected weightUnit)
+  const displayWeight = currentWeight != null ? Number(currentWeight) : null;
+
   // Weekly change calculation: compare current to log from ~7 days ago
   let weeklyChange = 0;
   if (currentWeight && logs.length > 1) {
@@ -509,21 +497,13 @@ const WeightTrackerScreen = ({ navigation }) => {
       }
     }
 
-    const currentVal =
-      weightUnit === "lbs" ? currentWeight * 2.20462 : currentWeight;
-    const pastVal =
-      weightUnit === "lbs"
-        ? Number(historicalLog.weight) * 2.20462
-        : Number(historicalLog.weight);
+    const currentVal = Number(currentWeight);
+    const pastVal = Number(historicalLog.weight);
     weeklyChange = Number((currentVal - pastVal).toFixed(1));
-  } else if (currentWeight && onboardingData?.weight) {
-    // If only 1 log, compare with original onboarding weight
-    const currentVal =
-      weightUnit === "lbs" ? currentWeight * 2.20462 : currentWeight;
-    const pastVal =
-      weightUnit === "lbs"
-        ? Number(onboardingData.weight) * 2.20462
-        : Number(onboardingData.weight);
+  } else if (currentWeight && (userProfile?.weight || onboardingData?.weight)) {
+    // If only 1 log, compare with original profile/onboarding weight
+    const currentVal = Number(currentWeight);
+    const pastVal = Number(userProfile?.weight || onboardingData?.weight);
     weeklyChange = Number((currentVal - pastVal).toFixed(1));
   }
 
@@ -594,12 +574,8 @@ const WeightTrackerScreen = ({ navigation }) => {
 
         let weightValue;
         if (logInWeek) {
-          // Use the logged weight for this week
-          const weight = Number(logInWeek.weight);
-          weightValue =
-            weightUnit === "lbs"
-              ? Number((weight * 2.20462).toFixed(1))
-              : weight;
+          // Use the logged weight for this week (already in user's unit)
+          weightValue = Number(logInWeek.weight);
         } else {
           // For weeks without data, show 0
           weightValue = 0;

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
+import { invalidateMainDashboardCache } from "../utils/cacheManager";
 
 export const globalPreferencesCache = {
   weightUnit: null,
@@ -238,6 +239,14 @@ const PreferencesScreen = () => {
         Alert.alert("Error", "Failed to update weight unit preference.");
       } else {
         console.log(`Weight successfully converted from ${dbUnit} to ${targetUnit}:`, updates);
+        invalidateMainDashboardCache();
+        try {
+          const { globalWeightCache } = require("../weightscreen/WeightTrackerScreen");
+          if (globalWeightCache) {
+            globalWeightCache.lastFetchTime = 0;
+            globalWeightCache.cachedData = null;
+          }
+        } catch (_) {}
       }
 
       // Update weight logs
@@ -308,6 +317,7 @@ const PreferencesScreen = () => {
         Alert.alert("Error", "Failed to update height unit preference.");
       } else {
         console.log(`Height successfully converted from ${dbUnit} to ${targetUnit}:`, updates);
+        invalidateMainDashboardCache();
       }
     } catch (err) {
       console.error("Exception in handleHeightUnitChange:", err);

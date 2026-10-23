@@ -618,14 +618,23 @@ const JournalScreen = () => {
         endDateStr,
       );
 
-      // 1. Get ALL weight logs for this user (we need historical data)
-      const { data: allLogs, error } = await supabase
-        .from("weight_logs")
-        .select("id, weight, date, note, emoji")
-        .eq("user_id", userId)
-        .order("date", { ascending: true }); // Oldest first for processing
+      // 1. Get ALL weight logs for this user (we need historical data) and user's weight_unit
+      const [{ data: allLogs, error }, { data: profile }] = await Promise.all([
+        supabase
+          .from("weight_logs")
+          .select("id, weight, date, note, emoji")
+          .eq("user_id", userId)
+          .order("date", { ascending: true }),
+        supabase
+          .from("user_profile")
+          .select("weight_unit")
+          .eq("id", userId)
+          .maybeSingle(),
+      ]);
 
       if (error) throw error;
+
+      const userWeightUnit = profile?.weight_unit || "kg";
 
       if (!allLogs || allLogs.length === 0) {
         console.log("⚠️ No weight logs found for user");
@@ -667,7 +676,7 @@ const JournalScreen = () => {
           result.push({
             id: `weight-${actualLog.id}`,
             title: "Weight Logged",
-            description: `${actualLog.weight} kg${actualLog.note ? " - " + actualLog.note : ""}`,
+            description: `${actualLog.weight} ${userWeightUnit}${actualLog.note ? " - " + actualLog.note : ""}`,
             type: "weight",
             _date: dateStr,
             _isActualLog: true,

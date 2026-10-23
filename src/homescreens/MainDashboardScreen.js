@@ -399,6 +399,8 @@ const MainDashboardScreen = ({ route }) => {
           setGoalWeight(globalCache.cachedData.goalWeight);
         if (globalCache.cachedData.weightProgress !== undefined)
           setProgress(globalCache.cachedData.weightProgress);
+        if (globalCache.cachedData.weightUnit !== undefined)
+          setWeightUnit(globalCache.cachedData.weightUnit);
       }
     };
 
@@ -419,6 +421,12 @@ const MainDashboardScreen = ({ route }) => {
   );
   const [goalAchieved, setGoalAchieved] = useState(
     () => globalCache.cachedData?.goalAchieved || false,
+  );
+  const [weightUnit, setWeightUnit] = useState(
+    () =>
+      globalCache.cachedData?.weightUnit ||
+      onboardingData?.selectedWeightUnit ||
+      "kg",
   );
   const [realUserId, setRealUserId] = useState(null);
 
@@ -445,6 +453,8 @@ const MainDashboardScreen = ({ route }) => {
           .maybeSingle();
 
         if (profile) {
+          const effectiveUnit = profile.weight_unit || "kg";
+          setWeightUnit(effectiveUnit);
           setOnboardingData((prev) => ({
             ...prev,
             ...profile,
@@ -457,7 +467,7 @@ const MainDashboardScreen = ({ route }) => {
             daily_activity_level: profile.daily_activity_level || prev.daily_activity_level,
             goal_focus: profile.goal_focus || prev.goal_focus,
             calorie_goal: profile.calorie_goal || prev.calorie_goal,
-            selectedWeightUnit: profile.weight_unit || prev.selectedWeightUnit || "kg",
+            selectedWeightUnit: effectiveUnit,
             selectedHeightUnit: profile.height_unit || prev.selectedHeightUnit || "cm",
           }));
         }
@@ -556,6 +566,15 @@ const MainDashboardScreen = ({ route }) => {
           todayWorkoutsRef.current = cached.todayWorkouts || 0;
           setTodayWorkouts(cached.todayWorkouts || 0);
         }
+        if (cached.currentWeight !== undefined) {
+          setCurrentWeight(cached.currentWeight);
+        }
+        if (cached.goalWeight !== undefined) {
+          setGoalWeight(cached.goalWeight);
+        }
+        if (cached.weightUnit && cached.weightUnit !== weightUnit) {
+          setWeightUnit(cached.weightUnit);
+        }
 
         globalCache.cacheHits++;
         if (isFresh) return;
@@ -601,7 +620,7 @@ const MainDashboardScreen = ({ route }) => {
               .lte("created_at", new Date(endOfDay).toISOString()),
             supabase
               .from("user_profile")
-              .select("weight, target_weight, goal_focus")
+              .select("weight, target_weight, goal_focus, weight_unit")
               .eq("id", realUserId)
               .single(),
             supabase
@@ -686,10 +705,14 @@ const MainDashboardScreen = ({ route }) => {
             }
           }
 
+          const effectiveUnit =
+            profile?.weight_unit || onboardingData?.selectedWeightUnit || "kg";
+
           setCurrentWeight(latestWeight > 0 ? latestWeight : null);
           setGoalWeight(goalNum);
           setProgress(prog);
           setGoalAchieved(isGoalAchieved);
+          setWeightUnit(effectiveUnit);
 
           globalCache.cachedData = {
             mealsLogged: filteredLogs.length,
@@ -707,6 +730,7 @@ const MainDashboardScreen = ({ route }) => {
             currentWeight: latestWeight > 0 ? latestWeight : null,
             goalWeight: goalNum,
             weightProgress: prog,
+            weightUnit: effectiveUnit,
             goalAchieved: isGoalAchieved,
           };
 
@@ -1622,13 +1646,13 @@ const MainDashboardScreen = ({ route }) => {
               <View style={styles.weightDataBox}>
                 <Text style={styles.weightJourneySubV2}>Current</Text>
                 <Text style={styles.weightJourneyCurrentV2}>
-                  {currentWeight ? `${currentWeight} kg` : "--"}
+                  {currentWeight ? `${currentWeight} ${weightUnit}` : "--"}
                 </Text>
               </View>
               <View style={styles.weightDataBoxRight}>
                 <Text style={styles.weightJourneySubV2}>Goal</Text>
                 <Text style={styles.weightJourneyGoalV2}>
-                  {goalWeight ? `${goalWeight} kg` : "--"}
+                  {goalWeight ? `${goalWeight} ${weightUnit}` : "--"}
                 </Text>
               </View>
             </View>
@@ -1647,7 +1671,7 @@ const MainDashboardScreen = ({ route }) => {
                 <Text style={styles.congratulationsText}>Goal achieved</Text>
                 <Text style={styles.progressText}>
                   You&apos;ve reached your target weight of {goalWeight || "--"}{" "}
-                  kg
+                  {weightUnit}
                 </Text>
               </View>
             ) : (
