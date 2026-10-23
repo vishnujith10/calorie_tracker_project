@@ -127,6 +127,17 @@ export const clearAllGlobalCaches = () => {
     console.log('Could not reset OnboardingContext:', e.message);
   }
   
+  // Clear PreferencesScreen cache
+  try {
+    const PreferencesScreen = require('../profilescreen/PreferencesScreen');
+    if (PreferencesScreen.globalPreferencesCache) {
+      PreferencesScreen.globalPreferencesCache.weightUnit = null;
+      PreferencesScreen.globalPreferencesCache.heightUnit = null;
+    }
+  } catch (e) {
+    console.log('Could not clear PreferencesScreen cache:', e.message);
+  }
+
   // Clear user-specific AsyncStorage keys (Summary cache, AI Coach sessions, onboarding data)
   try {
     AsyncStorage.getAllKeys()
@@ -135,6 +146,7 @@ export const clearAllGlobalCaches = () => {
           (k) =>
             k.startsWith('@calora_summary_cache_') ||
             k.startsWith('@calora_ai_coach_sessions') ||
+            k.startsWith('@calora_pref_') ||
             k === 'lastCheckDate' ||
             k === 'onboarded' ||
             k === 'onboardingData' ||

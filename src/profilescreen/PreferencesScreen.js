@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
@@ -14,6 +15,11 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 
+export const globalPreferencesCache = {
+  weightUnit: null,
+  heightUnit: null,
+};
+
 const APP_THEME = {
   primary: "#1F4E4A",
   mint: "#A8D5CE",
@@ -29,8 +35,14 @@ const PreferencesScreen = () => {
   const navigation = useNavigation();
   const { theme, updateTheme, colors, isDark } = useTheme();
 
-  const [weightUnit, setWeightUnit] = useState("kg");
-  const [heightUnit, setHeightUnit] = useState("cm");
+  const initialWeightUnit = globalPreferencesCache.weightUnit || "kg";
+  const initialHeightUnit = globalPreferencesCache.heightUnit || "cm";
+
+  const [weightUnit, setWeightUnit] = useState(initialWeightUnit);
+  const [heightUnit, setHeightUnit] = useState(initialHeightUnit);
+
+  const isConvertingWeightRef = useRef(false);
+  const isConvertingHeightRef = useRef(false);
 
   const [breakfastReminder, setBreakfastReminder] = useState(true);
   const [lunchReminder, setLunchReminder] = useState(true);
@@ -39,8 +51,12 @@ const PreferencesScreen = () => {
   const [workoutReminder, setWorkoutReminder] = useState(true);
   const [sleepReminder, setSleepReminder] = useState(false);
 
-  const weightSlideAnim = useRef(new Animated.Value(0)).current;
-  const heightSlideAnim = useRef(new Animated.Value(0)).current;
+  const weightSlideAnim = useRef(
+    new Animated.Value(initialWeightUnit === "lbs" ? 1 : 0)
+  ).current;
+  const heightSlideAnim = useRef(
+    new Animated.Value(initialHeightUnit === "ft" ? 1 : 0)
+  ).current;
   const themeSlideAnim = useRef(new Animated.Value(0)).current;
 
   const [weightButtonWidth, setWeightButtonWidth] = useState(0);
@@ -48,22 +64,74 @@ const PreferencesScreen = () => {
   const [themeButtonWidth, setThemeButtonWidth] = useState(0);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadLocalCache = async () => {
+      try {
+        const [cachedWeightUnit, cachedHeightUnit] = await Promise.all([
+          AsyncStorage.getItem("@calora_pref_weight_unit"),
+          AsyncStorage.getItem("@calora_pref_height_unit"),
+        ]);
+        if (!isMounted) return;
+        if (cachedWeightUnit && cachedWeightUnit !== weightUnit) {
+          globalPreferencesCache.weightUnit = cachedWeightUnit;
+          setWeightUnit(cachedWeightUnit);
+          weightSlideAnim.setValue(cachedWeightUnit === "lbs" ? 1 : 0);
+        }
+        if (cachedHeightUnit && cachedHeightUnit !== heightUnit) {
+          globalPreferencesCache.heightUnit = cachedHeightUnit;
+          setHeightUnit(cachedHeightUnit);
+          heightSlideAnim.setValue(cachedHeightUnit === "ft" ? 1 : 0);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    loadLocalCache();
     fetchUserPreferences();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const convertWeight = (value, fromUnit, toUnit) => {
-    if (fromUnit === toUnit) return value;
-    if (fromUnit === "kg" && toUnit === "lbs")
-      return (value * 2.20462).toFixed(1);
-    if (fromUnit === "lbs" && toUnit === "kg")
-      return (value / 2.20462).toFixed(1);
+    if (!value || fromUnit === toUnit) return value;
+    const num = Number(value);
+    if (isNaN(num) || num <= 0) return value;
+
+    if (fromUnit === "kg" && toUnit === "lbs") {
+      // 1 kg = 2.20462262 lbs
+      // 59 kg * 2.20462262 = 130.0727... -> 130.1 lbs
+      return parseFloat((num * 2.20462262).toFixed(1));
+    }
+    if (fromUnit === "lbs" && toUnit === "kg") {
+      // 130.1 lbs / 2.20462262 = 59.012... -> 59.0 kg
+      return parseFloat((num / 2.20462262).toFixed(1));
+    }
     return value;
   };
 
   const convertHeight = (value, fromUnit, toUnit) => {
-    if (fromUnit === toUnit) return value;
-    if (fromUnit === "cm" && toUnit === "ft") return (value / 30.48).toFixed(1);
-    if (fromUnit === "ft" && toUnit === "cm") return (value * 30.48).toFixed(1);
+    if (!value || fromUnit === toUnit) return value;
+    const num = Number(value);
+    if (isNaN(num) || num <= 0) return value;
+
+    if (fromUnit === "cm" && toUnit === "ft") {
+      // 1 ft = 30.48 cm
+      // 168 cm / 30.48 = 5.511811... ft -> 5.51 ft
+      return parseFloat((num / 30.48).toFixed(2));
+    }
+    if (fromUnit === "ft" && toUnit === "cm") {
+      // 5.51 ft * 30.48 = 167.9448 cm -> clean round to 168 cm
+      const cmVal = num * 30.48;
+      const rounded = Math.round(cmVal);
+      if (Math.abs(cmVal - rounded) < 0.15) {
+        return rounded;
+      }
+      return parseFloat(cmVal.toFixed(1));
+    }
     return value;
   };
 
@@ -86,179 +154,191 @@ const PreferencesScreen = () => {
       }
 
       if (data) {
-        setWeightUnit(data.weight_unit || "kg");
-        setHeightUnit(data.height_unit || "cm");
-      } else {
-        setWeightUnit("kg");
-        setHeightUnit("cm");
+        const dbWeightUnit = data.weight_unit || "kg";
+        const dbHeightUnit = data.height_unit || "cm";
+
+        globalPreferencesCache.weightUnit = dbWeightUnit;
+        globalPreferencesCache.heightUnit = dbHeightUnit;
+
+        setWeightUnit(dbWeightUnit);
+        setHeightUnit(dbHeightUnit);
+
+        AsyncStorage.setItem("@calora_pref_weight_unit", dbWeightUnit).catch(() => {});
+        AsyncStorage.setItem("@calora_pref_height_unit", dbHeightUnit).catch(() => {});
       }
     } catch (error) {
       console.error("Error fetching user preferences:", error);
     }
   };
 
-  const saveUnitPreference = async (unitType, value) => {
+  const handleWeightUnitChange = async (targetUnit) => {
+    if (targetUnit === weightUnit) return;
+    if (isConvertingWeightRef.current) return;
+    isConvertingWeightRef.current = true;
+
+    const oldUnit = weightUnit;
+    console.log(`Weight unit changing from ${oldUnit} to ${targetUnit}`);
+
+    // Update UI & Cache immediately
+    setWeightUnit(targetUnit);
+    globalPreferencesCache.weightUnit = targetUnit;
+    AsyncStorage.setItem("@calora_pref_weight_unit", targetUnit).catch(() => {});
+
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const updateData = {};
-      updateData[unitType] = value;
-
-      const { error } = await supabase
-        .from("user_profile")
-        .update(updateData)
-        .eq("id", user.id);
-
-      if (error) {
-        console.error("Error saving unit preference:", error);
-        Alert.alert("Error", "Failed to save preference. Please try again.");
+      if (!user) {
+        isConvertingWeightRef.current = false;
         return;
       }
 
-      console.log(`${unitType} preference saved successfully`);
-    } catch (error) {
-      console.error("Error saving unit preference:", error);
-      Alert.alert("Error", "Failed to save preference. Please try again.");
+      // Check current profile from database
+      const { data: profile, error } = await supabase
+        .from("user_profile")
+        .select("weight, target_weight, weight_unit")
+        .eq("id", user.id)
+        .single();
+
+      if (error || !profile) {
+        console.error("Error fetching profile for weight conversion:", error);
+        isConvertingWeightRef.current = false;
+        return;
+      }
+
+      const dbUnit = profile.weight_unit || oldUnit || "kg";
+
+      // If DB is already in targetUnit, avoid re-converting numbers
+      if (dbUnit === targetUnit) {
+        console.log(`DB weight_unit is already ${targetUnit}, skipping conversion`);
+        isConvertingWeightRef.current = false;
+        return;
+      }
+
+      const updates = { weight_unit: targetUnit };
+      if (profile.weight != null) {
+        updates.weight = convertWeight(Number(profile.weight), dbUnit, targetUnit);
+      }
+      if (profile.target_weight != null) {
+        updates.target_weight = convertWeight(
+          Number(profile.target_weight),
+          dbUnit,
+          targetUnit
+        );
+      }
+
+      // Atomically update user_profile in one single call
+      const { error: updateError } = await supabase
+        .from("user_profile")
+        .update(updates)
+        .eq("id", user.id);
+
+      if (updateError) {
+        console.error("Error updating user_profile weight & unit:", updateError);
+        Alert.alert("Error", "Failed to update weight unit preference.");
+      } else {
+        console.log(`Weight successfully converted from ${dbUnit} to ${targetUnit}:`, updates);
+      }
+
+      // Update weight logs
+      await convertWeightLogs(dbUnit, targetUnit, user.id);
+    } catch (err) {
+      console.error("Exception in handleWeightUnitChange:", err);
+    } finally {
+      isConvertingWeightRef.current = false;
     }
   };
 
-  const handleWeightUnitChange = async (unit) => {
-    const oldUnit = weightUnit;
-    console.log(`Weight unit changing from ${oldUnit} to ${unit}`);
-    setWeightUnit(unit);
-    saveUnitPreference("weight_unit", unit);
+  const handleHeightUnitChange = async (targetUnit) => {
+    if (targetUnit === heightUnit) return;
+    if (isConvertingHeightRef.current) return;
+    isConvertingHeightRef.current = true;
 
-    await convertUserWeightValues(oldUnit, unit);
-  };
-
-  const handleHeightUnitChange = async (unit) => {
     const oldUnit = heightUnit;
-    console.log(`Height unit changing from ${oldUnit} to ${unit}`);
-    setHeightUnit(unit);
-    saveUnitPreference("height_unit", unit);
+    console.log(`Height unit changing from ${oldUnit} to ${targetUnit}`);
 
-    await convertUserHeightValues(oldUnit, unit);
-  };
+    // Update UI & Cache immediately
+    setHeightUnit(targetUnit);
+    globalPreferencesCache.heightUnit = targetUnit;
+    AsyncStorage.setItem("@calora_pref_height_unit", targetUnit).catch(() => {});
 
-  const convertUserWeightValues = async (fromUnit, toUnit) => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        isConvertingHeightRef.current = false;
+        return;
+      }
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from("user_profile")
-        .select("weight, target_weight")
+        .select("height, height_unit")
         .eq("id", user.id)
         .single();
 
-      if (profile) {
-        const updates = {};
-
-        if (profile.weight) {
-          const convertedWeight = convertWeight(
-            Number(profile.weight),
-            fromUnit,
-            toUnit,
-          );
-          console.log(
-            `Converting weight: ${profile.weight} ${fromUnit} → ${convertedWeight} ${toUnit}`,
-          );
-          updates.weight = convertedWeight;
-        }
-
-        if (profile.target_weight) {
-          const convertedTargetWeight = convertWeight(
-            Number(profile.target_weight),
-            fromUnit,
-            toUnit,
-          );
-          console.log(
-            `Converting target weight: ${profile.target_weight} ${fromUnit} → ${convertedTargetWeight} ${toUnit}`,
-          );
-          updates.target_weight = convertedTargetWeight;
-        }
-
-        if (Object.keys(updates).length > 0) {
-          await supabase.from("user_profile").update(updates).eq("id", user.id);
-
-          console.log("Weight values converted successfully");
-        }
-
-        await convertWeightLogs(fromUnit, toUnit);
+      if (error || !profile) {
+        console.error("Error fetching profile for height conversion:", error);
+        isConvertingHeightRef.current = false;
+        return;
       }
-    } catch (error) {
-      console.error("Error converting weight values:", error);
-    }
-  };
 
-  const convertUserHeightValues = async (fromUnit, toUnit) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      const dbUnit = profile.height_unit || oldUnit || "cm";
 
-      const { data: profile } = await supabase
+      // If DB is already in targetUnit, avoid re-converting numbers
+      if (dbUnit === targetUnit) {
+        console.log(`DB height_unit is already ${targetUnit}, skipping conversion`);
+        isConvertingHeightRef.current = false;
+        return;
+      }
+
+      const updates = { height_unit: targetUnit };
+      if (profile.height != null) {
+        updates.height = convertHeight(Number(profile.height), dbUnit, targetUnit);
+      }
+
+      // Atomically update user_profile in one single call
+      const { error: updateError } = await supabase
         .from("user_profile")
-        .select("height")
-        .eq("id", user.id)
-        .single();
+        .update(updates)
+        .eq("id", user.id);
 
-      if (profile && profile.height) {
-        const convertedHeight = convertHeight(
-          Number(profile.height),
-          fromUnit,
-          toUnit,
-        );
-        console.log(
-          `Converting height: ${profile.height} ${fromUnit} → ${convertedHeight} ${toUnit}`,
-        );
-
-        await supabase
-          .from("user_profile")
-          .update({ height: convertedHeight })
-          .eq("id", user.id);
-
-        console.log("Height value converted successfully");
+      if (updateError) {
+        console.error("Error updating user_profile height & unit:", updateError);
+        Alert.alert("Error", "Failed to update height unit preference.");
+      } else {
+        console.log(`Height successfully converted from ${dbUnit} to ${targetUnit}:`, updates);
       }
-    } catch (error) {
-      console.error("Error converting height values:", error);
+    } catch (err) {
+      console.error("Exception in handleHeightUnitChange:", err);
+    } finally {
+      isConvertingHeightRef.current = false;
     }
   };
 
-  const convertWeightLogs = async (fromUnit, toUnit) => {
+  const convertWeightLogs = async (fromUnit, toUnit, userId) => {
+    if (!userId || fromUnit === toUnit) return;
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: logs } = await supabase
+      const { data: logs, error } = await supabase
         .from("weight_logs")
         .select("id, weight")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
-      if (logs && logs.length > 0) {
-        for (const log of logs) {
-          if (log.weight) {
-            const convertedWeight = convertWeight(
-              Number(log.weight),
-              fromUnit,
-              toUnit,
-            );
-            await supabase
-              .from("weight_logs")
-              .update({ weight: convertedWeight })
-              .eq("id", log.id);
-          }
+      if (error || !logs || logs.length === 0) return;
+
+      const updatePromises = logs.map((log) => {
+        if (log.weight != null) {
+          const newWeight = convertWeight(Number(log.weight), fromUnit, toUnit);
+          return supabase
+            .from("weight_logs")
+            .update({ weight: newWeight })
+            .eq("id", log.id);
         }
-        console.log("Weight logs converted successfully");
-      }
+        return Promise.resolve();
+      });
+
+      await Promise.all(updatePromises);
+      console.log("Weight logs converted successfully");
     } catch (error) {
       console.error("Error converting weight logs:", error);
     }

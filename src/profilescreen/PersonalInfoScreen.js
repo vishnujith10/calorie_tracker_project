@@ -148,10 +148,19 @@ const PersonalInfoScreen = () => {
         [field]: newValue,
       }));
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        Alert.alert("Error", "User session not found");
+        return;
+      }
+
       const { error } = await supabase
         .from("user_profile")
         .update({ [field]: newValue })
-        .eq("name", "Vishnujith");
+        .eq("id", user.id);
 
       if (error) {
         console.error("Error updating profile:", error);
