@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -353,6 +354,31 @@ const SleepTrackerScreen = () => {
   const fetchSleepGoal = useCallback(async () => {
     if (!realUserId) return;
     try {
+      // 1. Check local storage first for instant display
+      const storedGoal = await AsyncStorage.getItem(
+        `@calora_user_sleep_goal_${realUserId}`,
+      );
+      if (storedGoal) {
+        setSleepGoal(Number(storedGoal));
+      }
+
+      // 2. Fetch from user_profile
+      const { data: profile } = await supabase
+        .from("user_profile")
+        .select("sleep_goal")
+        .eq("id", realUserId)
+        .maybeSingle();
+
+      if (profile?.sleep_goal) {
+        setSleepGoal(profile.sleep_goal);
+        await AsyncStorage.setItem(
+          `@calora_user_sleep_goal_${realUserId}`,
+          String(profile.sleep_goal),
+        );
+        return;
+      }
+
+      // 3. Fallback: check recent sleep log
       const { data: recentLog, error: recentError } = await supabase
         .from("sleep_logs")
         .select("sleep_goal")
@@ -368,7 +394,11 @@ const SleepTrackerScreen = () => {
 
       if (recentLog && recentLog.length > 0 && recentLog[0].sleep_goal) {
         setSleepGoal(recentLog[0].sleep_goal);
-      } else {
+        await AsyncStorage.setItem(
+          `@calora_user_sleep_goal_${realUserId}`,
+          String(recentLog[0].sleep_goal),
+        );
+      } else if (!storedGoal) {
         setSleepGoal(8);
       }
     } catch (err) {
@@ -718,15 +748,43 @@ const SleepTrackerScreen = () => {
     if (!realUserId) return;
 
     try {
-      const { error } = await supabase.from("user_preferences").upsert([
-        {
-          user_id: realUserId,
-          sleep_goal: tempSleepGoal,
-        },
-      ]);
+      // 1. Update user_profile with the new sleep goal
+      const { error: profileError } = await supabase
+        .from("user_profile")
+        .update({ sleep_goal: tempSleepGoal })
+        .eq("id", realUserId);
 
-      if (error) throw error;
+      if (profileError) {
+        console.warn("Could not update sleep_goal in user_profile:", profileError);
+      }
 
+      // 2. Also update existing sleep log(s) for consistency
+      const { error: logError } = await supabase
+        .from("sleep_logs")
+        .update({ sleep_goal: tempSleepGoal })
+        .eq("user_id", realUserId);
+
+      if (logError) {
+        console.warn("Could not update sleep_goal in sleep_logs:", logError);
+      }
+
+      // 3. Persist to AsyncStorage for instant 0ms availability
+      await AsyncStorage.setItem(
+        `@calora_user_sleep_goal_${realUserId}`,
+        String(tempSleepGoal),
+      );
+
+      // 4. Optimistically update mainDashboardCache so Dashboard reflects it immediately
+      try {
+        const { getMainDashboardCache } = require("../utils/cacheManager");
+        const mainCache = getMainDashboardCache();
+        if (mainCache?.cachedData) {
+          mainCache.cachedData.sleepGoal = tempSleepGoal;
+          mainCache.lastFetchTime = Date.now();
+        }
+      } catch (_) {}
+
+      // 5. Update local state
       setSleepGoal(tempSleepGoal);
       setShowSleepGoalModal(false);
       Alert.alert("Success", "Sleep goal updated successfully!");

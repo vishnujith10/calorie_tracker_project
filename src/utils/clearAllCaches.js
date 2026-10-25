@@ -155,6 +155,7 @@ export const clearAllGlobalCaches = () => {
             k.startsWith('@calora_summary_cache_') ||
             k.startsWith('@calora_ai_coach_sessions') ||
             k.startsWith('@calora_pref_') ||
+            k.startsWith('@calora_user_sleep_goal_') ||
             k === 'lastCheckDate' ||
             k === 'onboarded' ||
             k === 'onboardingData' ||

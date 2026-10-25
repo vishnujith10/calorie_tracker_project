@@ -620,7 +620,7 @@ const MainDashboardScreen = ({ route }) => {
               .lte("created_at", new Date(endOfDay).toISOString()),
             supabase
               .from("user_profile")
-              .select("weight, target_weight, goal_focus, weight_unit")
+              .select("weight, target_weight, goal_focus, weight_unit, sleep_goal")
               .eq("id", realUserId)
               .single(),
             supabase
@@ -646,8 +646,10 @@ const MainDashboardScreen = ({ route }) => {
               (l) => l.date?.slice(0, 10) === todayStrInner,
             );
             setTodaySleepLog(todayLog || null);
-            if (sleepData.data[0]?.sleep_goal)
-              setSleepGoal(sleepData.data[0].sleep_goal);
+            const goalFromProfile = weightProfile.data?.sleep_goal;
+            const goalFromLog = sleepData.data[0]?.sleep_goal;
+            if (goalFromProfile || goalFromLog)
+              setSleepGoal(goalFromProfile || goalFromLog);
 
             if (todayLog) {
               const [sh, sm] = todayLog.start_time.split(":").map(Number);
