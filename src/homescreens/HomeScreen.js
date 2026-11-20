@@ -3,27 +3,27 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
 import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import {
-  Alert,
-  BackHandler,
-  Dimensions,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    BackHandler,
+    Dimensions,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { OnboardingContext } from "../context/OnboardingContext";
@@ -31,18 +31,17 @@ import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 import { createFoodLog, deleteFoodLog, getFoodLogs, resolveMealPhotoUrl } from "../utils/api";
 import {
-  getHomeScreenCache,
-  invalidateHomeScreenCache,
-  updateHomeScreenCacheOptimistic,
+    getHomeScreenCache,
+    invalidateHomeScreenCache,
+    updateHomeScreenCacheOptimistic,
 } from "../utils/cacheManager";
 import { getTodayCaloriesBurned } from "../utils/calorieCalculator";
 import { isInsightEnabled, isInsightEnabledSync } from "../utils/settingsHelper";
 import {
-  evaluateAndGetFoodStreak,
-  getFoodStreak,
-  getStreakRiskCalories,
-  recalculateFoodStreak,
-  updateFoodStreak
+    evaluateAndGetFoodStreak,
+    getFoodStreak,
+    recalculateFoodStreak,
+    updateFoodStreak
 } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
 
@@ -72,8 +71,8 @@ export const userNameCache = {
 };
 
 export {
-  invalidateHomeScreenCache,
-  updateHomeScreenCacheOptimistic as updateHomeScreenCache
+    invalidateHomeScreenCache,
+    updateHomeScreenCacheOptimistic as updateHomeScreenCache
 };
 
 const HomeHeader = React.memo(

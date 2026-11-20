@@ -4,20 +4,20 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  BackHandler,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Animated,
+    BackHandler,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { DailyCheckInModal } from "../components/DailyCheckInModal";
@@ -26,9 +26,9 @@ import { useTheme } from "../context/ThemeContext";
 import supabase from "../lib/supabase";
 import { getFoodLogs } from "../utils/api";
 import {
-  getMainDashboardCache,
-  invalidateMainDashboardCache,
-  updateMainDashboardCacheOptimistic,
+    getMainDashboardCache,
+    invalidateMainDashboardCache,
+    updateMainDashboardCacheOptimistic,
 } from "../utils/cacheManager";
 import { evaluateAndGetFoodStreak, getFoodStreak } from "../utils/streakService";
 import useTodaySteps from "../utils/useTodaySteps";
@@ -43,8 +43,8 @@ export const streakCache = {
 };
 
 export {
-  invalidateMainDashboardCache,
-  updateMainDashboardCacheOptimistic as updateMainDashboardCache
+    invalidateMainDashboardCache,
+    updateMainDashboardCacheOptimistic as updateMainDashboardCache
 };
 
 const SPACING = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };

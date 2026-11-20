@@ -6,8 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../context/ThemeContext';
 import { AI_CONFIG } from '../config/aiConfig';
+import { useTheme } from '../context/ThemeContext';
 import supabase from '../lib/supabase';
 import { createFoodLog } from '../utils/api';
 

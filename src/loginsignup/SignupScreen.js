@@ -1,23 +1,21 @@
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useContext, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OnboardingContext } from '../context/OnboardingContext';
 import { useTheme } from '../context/ThemeContext';
 import supabase from '../lib/supabase';
-import calculateCalorieProfile from '../utils/calorieCalculator';
 import saveUserProfile from '../utils/saveUserProfile';
 import { handleGoogleSignIn, initializeGoogleSignIn } from './googleSignInService';
 

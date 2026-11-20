@@ -43,6 +43,7 @@ import AppSettingsScreen from "./src/profilescreen/AppSettingsScreen";
 import PersonalInfoScreen from "./src/profilescreen/PersonalInfoScreen";
 import PreferencesScreen from "./src/profilescreen/PreferencesScreen";
 import ProfileScreen from "./src/profilescreen/ProfileScreen";
+import AICoachScreen from "./src/screens/AICoachScreen";
 import AuthLoadingScreen from "./src/screens/AuthLoadingScreen";
 import GoalMoodScreen from "./src/screens/GoalMoodScreen";
 import GoalScreen from "./src/screens/GoalScreen";
@@ -51,11 +52,10 @@ import MinimalSignupTestScreen from "./src/screens/MinimalSignupTestScreen";
 import TargetSummaryScreen from "./src/screens/TargetSummaryScreen";
 import SleepTrackerScreen from "./src/sleepscreen/SleepTrackerScreen";
 import StepTrackerScreen from "./src/steptrackerscreen/StepTrackerScreen";
+import SummaryScreen from "./src/summaryscreen/SummaryScreen";
 import AddWeightScreen from "./src/weightscreen/AddWeightScreen";
 import WeightTrackerScreen from "./src/weightscreen/WeightTrackerScreen";
 import WelcomeScreen from "./src/welcomescreen/WelcomeScreen";
-import AICoachScreen from "./src/screens/AICoachScreen";
-import SummaryScreen from "./src/summaryscreen/SummaryScreen";
 
 if (typeof global.structuredClone !== "function") {
   global.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
