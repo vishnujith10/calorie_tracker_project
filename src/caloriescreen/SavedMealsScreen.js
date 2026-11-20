@@ -172,14 +172,18 @@ const SavedMealsScreen = ({ navigation, route }) => {
     }, [meals, shouldForceRefresh, navigation, route]),
   );
 
-  const navigateToHome = useCallback(() => {
-    navigation.navigate("Home");
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate("Home");
+    }
   }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        navigateToHome();
+        handleBack();
         return true;
       };
 
@@ -189,7 +193,7 @@ const SavedMealsScreen = ({ navigation, route }) => {
       );
 
       return () => subscription.remove();
-    }, [navigateToHome])
+    }, [handleBack])
   );
 
   const filteredMeals = meals.filter((meal) => {
@@ -289,7 +293,7 @@ const SavedMealsScreen = ({ navigation, route }) => {
         {
           text: "OK",
           onPress: () => {
-            navigateToHome();
+            handleBack();
           },
         },
       ]);
@@ -401,7 +405,7 @@ const SavedMealsScreen = ({ navigation, route }) => {
       <View style={styles.headerWrap}>
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={navigateToHome}
+            onPress={handleBack}
             style={styles.headerIconBtn}
             activeOpacity={0.8}
           >
